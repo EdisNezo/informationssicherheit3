@@ -1,0 +1,182 @@
+[
+    {
+      "name": "Phishing-Angriffe",
+      "type": "Phishing",
+      "category": "Social Engineering",
+      "description": "Phishing-Angriffe verwenden gefälschte E-Mails, Nachrichten oder Websites, um Benutzer dazu zu verleiten, sensible Informationen preiszugeben oder schädliche Aktionen auszuführen. Im medizinischen Kontext zielen diese Angriffe oft auf Patientendaten, Zugangsdaten zu medizinischen Systemen oder Finanzinformationen ab.",
+      "impact": "Erfolgreiche Phishing-Angriffe können zum Diebstahl sensibler Patientendaten, zur Kompromittierung medizinischer Systeme, zu Ransomware-Infektionen und zur Verletzung der Datenschutzbestimmungen führen. Dies kann schwerwiegende rechtliche, finanzielle und rufschädigende Folgen für medizinische Einrichtungen haben.",
+      "severity": "high",
+      "mitigations": [
+        "Schulung des Personals zur Erkennung von Phishing-Versuchen",
+        "Implementierung von E-Mail-Filtern und Anti-Phishing-Lösungen",
+        "Verifizierung verdächtiger Anfragen über einen separaten Kommunikationskanal",
+        "Regelmäßige Phishing-Simulationen und Awareness-Trainings",
+        "Einrichtung von Zwei-Faktor-Authentifizierung für alle kritischen Systeme"
+      ],
+      "examples": [
+        "E-Mail, die vorgibt, vom IT-Support zu sein und nach Zugangsdaten fragt",
+        "Nachricht mit dringendem Aufruf, einen Link zu einem angeblichen Patientenbericht zu öffnen",
+        "Gefälschte Login-Seite für das Krankenhausinformationssystem"
+      ]
+    },
+    {
+      "name": "Malware und Ransomware",
+      "type": "Malware",
+      "category": "Schadsoftware",
+      "description": "Malware umfasst verschiedene Arten von schädlicher Software, die Systeme infiltrieren kann. Ransomware verschlüsselt Daten und fordert Lösegeld für den Entschlüsselungsschlüssel. In medizinischen Einrichtungen können diese Angriffe die Patientenversorgung direkt beeinträchtigen, indem sie den Zugriff auf kritische Systeme und Daten blockieren.",
+      "impact": "Ransomware-Angriffe können medizinische Geräte, elektronische Patientenakten und klinische Systeme lahmlegen, was zu Behandlungsverzögerungen, Patientengefährdung und erheblichen finanziellen Verlusten führt. Die Wiederherstellung kann Tage oder Wochen dauern und den normalen Betrieb erheblich stören.",
+      "severity": "critical",
+      "mitigations": [
+        "Regelmäßige Sicherheitsupdates und Patches für alle Systeme",
+        "Robuste Backup-Strategien mit Offline-Kopien kritischer Daten",
+        "Einsatz von Endpoint Protection und Antivirus-Software",
+        "Netzwerksegmentierung zur Isolierung kritischer medizinischer Systeme",
+        "Incident-Response-Plan speziell für Ransomware-Szenarien"
+      ],
+      "examples": [
+        "WannaCry-Ransomware, die 2017 zahlreiche Krankenhäuser betraf",
+        "Trojaner, getarnt als medizinische Bildgebungssoftware-Update",
+        "Verschlüsselung elektronischer Patientenakten durch Ransomware"
+      ]
+    },
+    {
+      "name": "Ungesicherte medizinische Geräte",
+      "type": "Mobile Geräte",
+      "category": "IoMT",
+      "description": "Vernetzte medizinische Geräte (Internet of Medical Things, IoMT) verfügen oft über unzureichende Sicherheitsmaßnahmen und können als Einfallstor für Angreifer dienen. Dazu gehören Patientenmonitore, Infusionspumpen, Bildgebungsgeräte und andere medizinische Systeme mit Netzwerkanbindung.",
+      "impact": "Kompromittierte medizinische Geräte können die Patientensicherheit gefährden, als Einstiegspunkt für laterale Bewegungen im Netzwerk dienen, zu Datenschutzverletzungen führen und die Integrität medizinischer Daten beeinträchtigen.",
+      "severity": "high",
+      "mitigations": [
+        "Inventarisierung aller vernetzten medizinischen Geräte",
+        "Implementierung einer segmentierten Netzwerkarchitektur für medizinische Geräte",
+        "Regelmäßige Sicherheitsbewertungen und Penetrationstests",
+        "Zusammenarbeit mit Herstellern für Sicherheitsupdates und Patches",
+        "Entwicklung von Richtlinien für die sichere Nutzung vernetzter medizinischer Geräte"
+      ],
+      "examples": [
+        "Insulin-Pumpen mit veralteter Firmware und bekannten Sicherheitslücken",
+        "Unverschlüsselte Datenübertragung zwischen Patientenmonitor und Zentralstation",
+        "Medizinisches Bildgebungsgerät ohne Authentifizierungsmechanismen"
+      ]
+    },
+    {
+      "name": "Schwache Passwörter und Zugangsdaten",
+      "type": "Passwort-Sicherheit",
+      "category": "Authentifizierung",
+      "description": "Schwache, gemeinsam genutzte oder selten geänderte Passwörter stellen ein erhebliches Sicherheitsrisiko in medizinischen Einrichtungen dar. In hektischen medizinischen Umgebungen werden Passwörter oft zwischen Mitarbeitern geteilt, um einen schnellen Zugriff zu ermöglichen, oder sie werden an leicht zugänglichen Orten notiert.",
+      "impact": "Kompromittierte Zugangsdaten ermöglichen unbefugten Zugriff auf sensible Patientendaten, klinische Systeme und administrative Funktionen. Dies kann zu Datenschutzverletzungen, manipulierten medizinischen Aufzeichnungen und Compliance-Verstößen führen.",
+      "severity": "high",
+      "mitigations": [
+        "Implementierung einer starken Passwort-Richtlinie mit regelmäßigen Änderungen",
+        "Einsatz von Zwei-Faktor-Authentifizierung für alle kritischen Systeme",
+        "Single Sign-On (SSO) zur Reduzierung der Passwort-Belastung",
+        "Biometrische Authentifizierungsoptionen für klinische Arbeitsplätze",
+        "Regelmäßige Audits von Zugriffsrechten und Benutzerkonten"
+      ],
+      "examples": [
+        "Gemeinsam genutztes Passwort für den Zugriff auf die elektronische Patientenakte",
+        "Post-it mit Anmeldeinformationen am Monitor im Schwesternzimmer",
+        "Standardpasswörter auf medizinischen Geräten, die nie geändert wurden"
+      ]
+    },
+    {
+      "name": "Insider-Bedrohungen",
+      "type": "Insider-Bedrohungen",
+      "category": "Personal",
+      "description": "Insider-Bedrohungen gehen von Mitarbeitern, Auftragnehmern oder anderen Personen mit legitimen Zugriffsrechten aus, die diese absichtlich missbrauchen oder unwissentlich kompromittieren. Im Gesundheitswesen können diese Bedrohungen besonders schädlich sein, da Insider bereits Zugang zu sensiblen Systemen und Daten haben.",
+      "impact": "Insider-Bedrohungen können zu unbefugtem Zugriff auf Patientendaten, Diebstahl von Forschungsdaten, Manipulation von medizinischen Aufzeichnungen und Verletzung der Datenschutzbestimmungen führen. Die Erkennung solcher Aktivitäten ist oft schwieriger als bei externen Bedrohungen.",
+      "severity": "medium",
+      "mitigations": [
+        "Implementierung des Prinzips der geringsten Privilegien für alle Benutzerkonten",
+        "Regelmäßige Schulungen zu Datenschutz und Informationssicherheit",
+        "Einsatz von Benutzerverhaltenanalyse-Tools zur Erkennung ungewöhnlicher Aktivitäten",
+        "Klare Prozesse für Onboarding und Offboarding von Mitarbeitern",
+        "Whistleblower-Programm zur Meldung verdächtiger Aktivitäten"
+      ],
+      "examples": [
+        "Mitarbeiter, der Patientendaten für persönliche Zwecke einsieht",
+        "Temporärer Mitarbeiter, der unbefugt medizinische Aufzeichnungen kopiert",
+        "Arzt, der sein Passwort mit nicht autorisierten Kollegen teilt"
+      ]
+    },
+    {
+      "name": "Ungeschützte mobile Geräte",
+      "type": "Mobile Geräte",
+      "category": "Endpunktsicherheit",
+      "description": "Mobile Geräte wie Tablets, Smartphones und Laptops werden zunehmend für den Zugriff auf Patientendaten und klinische Systeme verwendet. Ungeschützte oder persönliche Geräte stellen ein erhebliches Sicherheitsrisiko dar, insbesondere wenn sie außerhalb der kontrollierten Krankenhausumgebung verwendet werden.",
+      "impact": "Verlorene oder gestohlene Geräte können zu Datenschutzverletzungen führen, während ungeschützte Geräte anfälliger für Malware und unbefugten Zugriff sind. Die Nutzung persönlicher Geräte (BYOD) erhöht das Risiko der Datenexposition und der Umgehung von Sicherheitskontrollen.",
+      "severity": "high",
+      "mitigations": [
+        "Implementierung einer Mobile Device Management (MDM) Lösung",
+        "Durchsetzung von Geräteverschlüsselung und Passwortschutz",
+        "Klare BYOD-Richtlinien mit Mindestanforderungen an die Sicherheit",
+        "Remote-Wipe-Funktionalität für verlorene oder gestohlene Geräte",
+        "Containerisierung von geschäftlichen Daten auf mobilen Geräten"
+      ],
+      "examples": [
+        "Unverschlüsseltes Tablet mit Patientendaten, das in der Cafeteria vergessen wurde",
+        "Persönliches Smartphone, das für den Zugriff auf klinische E-Mails verwendet wird",
+        "Laptop ohne Endpunktschutz, der für Telearbeit eingesetzt wird"
+      ]
+    },
+    {
+      "name": "Datenexfiltration",
+      "type": "Datendiebstahl",
+      "category": "Datensicherheit",
+      "description": "Datenexfiltration bezeichnet den unbefugten Transfer sensibler Informationen aus einer Organisation. Im Gesundheitswesen sind medizinische Forschungsdaten, Patientenakten und geistiges Eigentum besonders wertvolle Ziele für Datendiebstahl, sei es durch externe Angreifer oder Insider.",
+      "impact": "Datenexfiltration führt zu Verstößen gegen Datenschutzgesetze wie die DSGVO, zu Verlust von Forschungsvorsprüngen, zu Reputationsschäden und potenziellen rechtlichen Konsequenzen. Gestohlene Patientendaten können für Identitätsdiebstahl, Versicherungsbetrug oder Erpressung missbraucht werden.",
+      "severity": "high",
+      "mitigations": [
+        "Einsatz von Data Loss Prevention (DLP) Lösungen",
+        "Verschlüsselung sensibler Daten im Ruhezustand und bei der Übertragung",
+        "Einschränkung des Zugriffs auf und der Übertragung von sensiblen Daten",
+        "Netzwerküberwachung zur Erkennung ungewöhnlicher Datenübertragungen",
+        "Klassifizierung von Daten nach Schutzbedarf für gezielte Schutzmaßnahmen"
+      ],
+      "examples": [
+        "Massenhafte Downloads von Patientenakten außerhalb der regulären Arbeitszeiten",
+        "Übertragung sensibler Forschungsdaten an externe E-Mail-Adressen",
+        "Verwendung nicht autorisierter Cloud-Speicherdienste für medizinische Dokumente"
+      ]
+    },
+    {
+      "name": "Unzureichendes Sicherheitsbewusstsein",
+      "type": "Schulung",
+      "category": "Mitarbeitersensibilisierung",
+      "description": "Mangelndes Sicherheitsbewusstsein bei Mitarbeitern führt oft zu unbewussten Sicherheitsverletzungen. In medizinischen Einrichtungen, wo der Fokus stark auf der Patientenversorgung liegt, wird die IT-Sicherheit häufig als Hindernis für effiziente Arbeitsabläufe wahrgenommen, was zu riskanten Verhaltensweisen führen kann.",
+      "impact": "Mangelndes Sicherheitsbewusstsein erhöht die Wahrscheinlichkeit erfolgreicher Social-Engineering-Angriffe, führt zu unsicheren Arbeitspraktiken und reduziert die Wirksamkeit technischer Sicherheitsmaßnahmen. Es ist ein Multiplikator für nahezu alle anderen Sicherheitsrisiken.",
+      "severity": "medium",
+      "mitigations": [
+        "Regelmäßige, auf die Rolle zugeschnittene Sicherheitsschulungen",
+        "Phishing-Simulationen mit nachfolgendem Training",
+        "Integration von Sicherheitsbewusstsein in Onboarding-Prozesse",
+        "Klare, leicht verständliche Sicherheitsrichtlinien",
+        "Förderung einer positiven Sicherheitskultur durch Anerkennung und Anreize"
+      ],
+      "examples": [
+        "Medizinisches Personal, das Sicherheitshinweise ignoriert, um Zeit zu sparen",
+        "Unzureichendes Verständnis für die Bedeutung von Datenschutz und Vertraulichkeit",
+        "Nichtmeldung verdächtiger Sicherheitsvorfälle aus Angst vor Konsequenzen"
+      ]
+    },
+    {
+      "name": "Veraltete Software und Systeme",
+      "type": "Patch-Management",
+      "category": "Systemsicherheit",
+      "description": "Veraltete Software, Betriebssysteme und medizinische Anwendungen mit bekannten Sicherheitslücken sind ein häufiges Problem in medizinischen Einrichtungen. Aufgrund komplexer Abhängigkeiten, Validierungsanforderungen und Verfügbarkeitsanforderungen werden Updates oft verzögert oder vermieden.",
+      "impact": "Ungepatche Systeme sind anfällig für bekannte Exploits und können leicht kompromittiert werden. Dies kann zu Systemausfällen, Datenschutzverletzungen und Beeinträchtigungen der Patientenversorgung führen. Veraltete Systeme sind oft das erste Ziel bei gezielten Angriffen.",
+      "severity": "high",
+      "mitigations": [
+        "Implementierung eines formalen Patch-Management-Prozesses",
+        "Regelmäßige Sicherheitsbewertungen und Verwundbarkeitsscans",
+        "Virtuelle Patches durch Netzwerksicherheitsmaßnahmen, wenn direkte Updates nicht möglich sind",
+        "Isolation veralteter, aber notwendiger Systeme in separaten Netzwerksegmenten",
+        "Risikobasierte Priorisierung von Updates für kritische Systeme"
+      ],
+      "examples": [
+        "Medizinische Geräte mit Windows XP, für die keine Updates mehr verfügbar sind",
+        "Ungepatche Datenbanken mit Patienteninformationen",
+        "Outdated Browser mit bekannten Sicherheitslücken auf klinischen Arbeitsplätzen"
+      ]
+    }
+]

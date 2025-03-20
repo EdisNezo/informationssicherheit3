@@ -1,0 +1,20 @@
+# Web framework and API
+fastapi
+uvicorn
+python-dotenv
+jinja2
+websockets
+pydantic
+
+# Vector database and embeddings
+chromadb
+sentence-transformers
+
+# LLM client
+requests
+
+# Utilities
+numpy
+pandas
+python-multipart
+markdown

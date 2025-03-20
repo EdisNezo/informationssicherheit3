@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Security Script Generator</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f8f9fa;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        max-width: 1200px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 200px);
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        overflow: hidden;
+      }
+
+      .chat-header {
+        padding: 15px;
+        background-color: #007bff;
+        color: white;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+      }
+
+      .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .chat-input {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+      }
+
+      .message {
+        margin-bottom: 15px;
+        max-width: 80%;
+      }
+
+      .message-user {
+        align-self: flex-end;
+        margin-left: auto;
+        background-color: #007bff;
+        color: white;
+        border-radius: 18px 18px 0 18px;
+        padding: 10px 15px;
+      }
+
+      .message-assistant {
+        align-self: flex-start;
+        background-color: #e9ecef;
+        color: #212529;
+        border-radius: 18px 18px 18px 0;
+        padding: 10px 15px;
+      }
+
+      .message-timestamp {
+        font-size: 0.7rem;
+        margin-top: 5px;
+        color: #6c757d;
+      }
+
+      .typing-indicator {
+        display: inline-block;
+        padding: 10px 15px;
+        background-color: #e9ecef;
+        border-radius: 18px 18px 18px 0;
+        margin-bottom: 15px;
+      }
+
+      .typing-indicator span {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #6c757d;
+        border-radius: 50%;
+        margin-right: 5px;
+        animation: typing 1s infinite;
+      }
+
+      .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+
+      .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+        margin-right: 0;
+      }
+
+      @keyframes typing {
+        0% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-5px);
+        }
+        100% {
+          transform: translateY(0px);
+        }
+      }
+
+      .script-container {
+        display: none;
+        height: calc(100vh - 200px);
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        overflow: hidden;
+      }
+
+      .script-header {
+        padding: 15px;
+        background-color: #28a745;
+        color: white;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .script-content {
+        padding: 20px;
+        overflow-y: auto;
+        height: calc(100% - 60px);
+      }
+
+      .nav-pills .nav-link.active {
+        background-color: #007bff;
+      }
+
+      #loadingIndicator {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .spinner-border {
+        width: 3rem;
+        height: 3rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container py-4">
+      <h1 class="mb-4 text-center">Security Script Generator</h1>
+
+      <ul
+        class="nav nav-pills mb-3 justify-content-center"
+        id="mainTab"
+        role="tablist"
+      >
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link active"
+            id="chat-tab"
+            data-bs-toggle="pill"
+            data-bs-target="#chat"
+            type="button"
+            role="tab"
+            aria-controls="chat"
+            aria-selected="true"
+          >
+            <i class="fas fa-comments me-2"></i>Chat
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="script-tab"
+            data-bs-toggle="pill"
+            data-bs-target="#script"
+            type="button"
+            role="tab"
+            aria-controls="script"
+            aria-selected="false"
+          >
+            <i class="fas fa-file-alt me-2"></i>Generated Script
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content" id="mainTabContent">
+        <div
+          class="tab-pane fade show active"
+          id="chat"
+          role="tabpanel"
+          aria-labelledby="chat-tab"
+        >
+          <div class="chat-container">
+            <div class="chat-header">
+              <h5 class="mb-0">Conversation</h5>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+              <!-- Messages will be added here -->
+            </div>
+            <div class="chat-input">
+              <form id="messageForm">
+                <div class="input-group">
+                  <input
+                    type="text"
+                    id="messageInput"
+                    class="form-control"
+                    placeholder="Type your message..."
+                    required
+                  />
+                  <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="tab-pane fade"
+          id="script"
+          role="tabpanel"
+          aria-labelledby="script-tab"
+        >
+          <div class="script-container">
+            <div class="script-header">
+              <h5 class="mb-0">Generated Script</h5>
+              <div>
+                <button id="refreshScriptBtn" class="btn btn-sm btn-light me-2">
+                  <i class="fas fa-sync-alt"></i>
+                </button>
+                <div class="dropdown d-inline-block">
+                  <button
+                    class="btn btn-sm btn-light dropdown-toggle"
+                    type="button"
+                    id="exportDropdown"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false"
+                  >
+                    <i class="fas fa-download me-1"></i> Export
+                  </button>
+                  <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                    <li>
+                      <a class="dropdown-item" href="#" id="exportMarkdown"
+                        >Markdown (.md)</a
+                      >
+                    </li>
+                    <li>
+                      <a class="dropdown-item" href="#" id="exportJSON"
+                        >JSON (.json)</a
+                      >
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="script-content" id="scriptContent">
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i> No script has been
+                generated yet. Use the chat to create a script.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="loadingIndicator">
+      <div class="spinner-border text-light" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+      let sessionId = null;
+      let socket = null;
+      let isGenerating = false;
+
+      // Initialize on page load
+      document.addEventListener("DOMContentLoaded", () => {
+        initializeSession();
+
+        // Form submission
+        document
+          .getElementById("messageForm")
+          .addEventListener("submit", (e) => {
+            e.preventDefault();
+            sendMessage();
+          });
+
+        // Export buttons
+        document
+          .getElementById("exportMarkdown")
+          .addEventListener("click", () => exportScript("markdown"));
+        document
+          .getElementById("exportJSON")
+          .addEventListener("click", () => exportScript("json"));
+
+        // Refresh script button
+        document
+          .getElementById("refreshScriptBtn")
+          .addEventListener("click", refreshScript);
+      });
+
+      // Initialize a new session
+      async function initializeSession() {
+        showLoading();
+        try {
+          const response = await fetch("/api/sessions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+          sessionId = data.session_id;
+
+          // Add the initial message
+          addMessage("assistant", data.message);
+
+          // Connect WebSocket
+          connectWebSocket();
+        } catch (error) {
+          console.error("Error initializing session:", error);
+          addErrorMessage(
+            "Failed to initialize session. Please refresh the page and try again."
+          );
+        } finally {
+          hideLoading();
+        }
+      }
+
+      // Connect to WebSocket
+      function connectWebSocket() {
+        if (socket) {
+          socket.close();
+        }
+
+        socket = new WebSocket(
+          `ws://${window.location.host}/ws/chat/${sessionId}`
+        );
+
+        socket.onopen = () => {
+          console.log("WebSocket connection established");
+        };
+
+        socket.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+
+          if (data.type === "message") {
+            addMessage(data.role, data.content);
+            hideTypingIndicator();
+          } else if (data.type === "generation_complete") {
+            isGenerating = false;
+            addMessage("assistant", data.message);
+            hideTypingIndicator();
+            refreshScript();
+          }
+        };
+
+        socket.onclose = () => {
+          console.log("WebSocket connection closed");
+          // Try to reconnect after a delay
+          setTimeout(connectWebSocket, 3000);
+        };
+
+        socket.onerror = (error) => {
+          console.error("WebSocket error:", error);
+        };
+
+        // Keep-alive ping
+        setInterval(() => {
+          if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(
+              JSON.stringify({
+                type: "ping",
+                session_id: sessionId,
+              })
+            );
+          }
+        }, 30000);
+      }
+
+      // Send a message via REST API
+      async function sendMessage() {
+        const messageInput = document.getElementById("messageInput");
+        const message = messageInput.value.trim();
+
+        if (!message || !sessionId) return;
+
+        // Clear input
+        messageInput.value = "";
+
+        // Add user message
+        addMessage("user", message);
+
+        // Show typing indicator
+        showTypingIndicator();
+
+        try {
+          const response = await fetch("/api/messages", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              session_id: sessionId,
+              message: message,
+            }),
+          });
+
+          const data = await response.json();
+
+          // Add assistant message
+          addMessage("assistant", data.message);
+        } catch (error) {
+          console.error("Error sending message:", error);
+          addErrorMessage("Failed to send message. Please try again.");
+        } finally {
+          hideTypingIndicator();
+        }
+      }
+
+      // Add a message to the chat
+      function addMessage(role, content) {
+        const chatMessages = document.getElementById("chatMessages");
+        const messageDiv = document.createElement("div");
+
+        messageDiv.className = `message message-${role}`;
+
+        // Use marked.js to render markdown
+        messageDiv.innerHTML = marked.parse(content);
+
+        // Add timestamp
+        const timestamp = document.createElement("div");
+        timestamp.className = "message-timestamp";
+        timestamp.textContent = new Date().toLocaleTimeString();
+        messageDiv.appendChild(timestamp);
+
+        chatMessages.appendChild(messageDiv);
+
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Check if this is a generation message
+        if (
+          role === "assistant" &&
+          content.includes("Schulungsskript") &&
+          content.includes("generiert")
+        ) {
+          refreshScript();
+        }
+      }
+
+      // Add an error message
+      function addErrorMessage(message) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "alert alert-danger mt-3";
+        messageDiv.textContent = message;
+        document.getElementById("chatMessages").appendChild(messageDiv);
+      }
+
+      // Show typing indicator
+      function showTypingIndicator() {
+        const chatMessages = document.getElementById("chatMessages");
+        const indicator = document.createElement("div");
+        indicator.className = "typing-indicator";
+        indicator.innerHTML = "<span></span><span></span><span></span>";
+        indicator.id = "typingIndicator";
+        chatMessages.appendChild(indicator);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      // Hide typing indicator
+      function hideTypingIndicator() {
+        const indicator = document.getElementById("typingIndicator");
+        if (indicator) {
+          indicator.remove();
+        }
+      }
+
+      // Refresh the generated script
+      async function refreshScript() {
+        if (!sessionId) return;
+
+        showLoading();
+        try {
+          const response = await fetch(`/api/script/${sessionId}`);
+          const data = await response.json();
+
+          if (data.script) {
+            document.getElementById("scriptContent").innerHTML = marked.parse(
+              data.script
+            );
+            document.querySelector(".script-container").style.display = "block";
+          }
+        } catch (error) {
+          console.error("Error refreshing script:", error);
+        } finally {
+          hideLoading();
+        }
+      }
+
+      // Export the script
+      async function exportScript(format) {
+        if (!sessionId) return;
+
+        showLoading();
+        try {
+          const response = await fetch("/api/export-script", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              session_id: sessionId,
+              format: format,
+            }),
+          });
+
+          if (response.ok) {
+            // Create a download from the response
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = `script_${format === "markdown" ? "md" : "json"}`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+          } else {
+            const errorData = await response.json();
+            alert(`Error exporting script: ${errorData.detail}`);
+          }
+        } catch (error) {
+          console.error("Error exporting script:", error);
+          alert("Failed to export script. Please try again.");
+        } finally {
+          hideLoading();
+        }
+      }
+
+      // Show loading indicator
+      function showLoading() {
+        document.getElementById("loadingIndicator").style.display = "flex";
+      }
+
+      // Hide loading indicator
+      function hideLoading() {
+        document.getElementById("loadingIndicator").style.display = "none";
+      }
+    </script>
+  </body>
+</html>
