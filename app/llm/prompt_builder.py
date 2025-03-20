@@ -403,7 +403,9 @@ class PromptBuilder:
         
         return prompt
     
-    def build_hallucination_check_prompt(self, generated_content: str, retrieved_context: str) -> str:
+    def build_hallucination_check_prompt(self, 
+                                   generated_content: str, 
+                                   retrieved_context: str) -> str:
         """
         Build a prompt for checking generated content for potential hallucinations.
         
@@ -414,50 +416,54 @@ class PromptBuilder:
         Returns:
             Hallucination check prompt
         """
+        # Wir müssen alle % Zeichen escapen, um Probleme mit Format-Spezifizierern zu vermeiden
+        safe_generated_content = generated_content.replace("%", "%%")
+        safe_retrieved_context = retrieved_context.replace("%", "%%")
+        
         prompt = f"""
         # HALLUCINATION DETECTION TASK
         Carefully analyze the generated content and identify any statements that might be hallucinations (facts or claims that are not supported by the retrieved context).
 
         # GENERATED CONTENT
-        {generated_content}
+        {safe_generated_content}
 
         # RETRIEVED CONTEXT (GROUND TRUTH)
-        {retrieved_context}
+        {safe_retrieved_context}
 
         # INSTRUCTIONS
         1. Compare the generated content against the retrieved context
         2. Identify any statements in the generated content that:
-           - Contradict information in the retrieved context
-           - Make specific factual claims not supported by the retrieved context
-           - Introduce terminology, procedures, or concepts not present in the retrieved context
+        - Contradict information in the retrieved context
+        - Make specific factual claims not supported by the retrieved context
+        - Introduce terminology, procedures, or concepts not present in the retrieved context
         3. Ignore stylistic differences and focus only on factual accuracy
         4. For each potential hallucination, provide:
-           - The exact quote from the generated content
-           - Why it appears to be a hallucination
-           - A suggested correction (if possible)
+        - The exact quote from the generated content
+        - Why it appears to be a hallucination
+        - A suggested correction (if possible)
 
         # OUTPUT FORMAT
         Provide your analysis in the following JSON format:
         ```json
-        {
-          "has_hallucinations": true/false,
-          "hallucinations": [
-            {
-              "text": "quoted text from generated content",
-              "reason": "explanation of why this is a hallucination",
-              "correction": "suggested correction"
-            },
+        {{
+        "has_hallucinations": true/false,
+        "hallucinations": [
+            {{
+            "text": "quoted text from generated content",
+            "reason": "explanation of why this is a hallucination",
+            "correction": "suggested correction"
+            }},
             ...
-          ]
-        }
+        ]
+        }}
         ```
 
         If no hallucinations are found, return:
         ```json
-        {
-          "has_hallucinations": false,
-          "hallucinations": []
-        }
+        {{
+        "has_hallucinations": false,
+        "hallucinations": []
+        }}
         ```
 
         # ANALYSIS

@@ -4,9 +4,10 @@ This module coordinates the question-answering process and maintains conversatio
 """
 
 from typing import Dict, List, Any, Optional, Tuple, Union
-import json
 import re
 from datetime import datetime
+import json
+import traceback  # Diese Zeile hinzufügen
 
 from app.utils import system_logger, time_operation, generate_session_id, log_chat_message
 from app.llm.ollama_client import ollama_client
