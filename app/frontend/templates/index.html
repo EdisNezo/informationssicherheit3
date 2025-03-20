@@ -372,8 +372,9 @@
           socket.close();
         }
 
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         socket = new WebSocket(
-          `ws://${window.location.host}/ws/chat/${sessionId}`
+          `${protocol}//${window.location.host}/ws/chat/${sessionId}`
         );
 
         socket.onopen = () => {
