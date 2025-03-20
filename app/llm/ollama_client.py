@@ -38,30 +38,27 @@ class OllamaClient:
     
     @time_operation
     def generate(self, 
-            prompt: str, 
-            system_prompt: Optional[str] = None,
-            temperature: float = 0.7,
-            max_tokens: Optional[int] = None,
-            stream: bool = False) -> Union[str, Generator[str, None, None]]:
-        """
-        Generate text from the LLM.
+                prompt: str, 
+                system_prompt: Optional[str] = None,
+                temperature: float = 0.7,
+                max_tokens: Optional[int] = None,
+                stream: bool = False) -> Union[str, Generator[str, None, None]]:
         
-        Args:
-            prompt: User prompt
-            system_prompt: Optional system prompt
-            temperature: Sampling temperature
-            max_tokens: Maximum tokens to generate
-            stream: Whether to stream the response
-            
-        Returns:
-            Generated text or generator yielding text chunks if streaming
-        """
+        # Debug logging
+        try:
+            system_logger.debug(f"Prompt first 100 chars: {prompt[:100]}")
+            system_logger.debug(f"Prompt last 100 chars: {prompt[-100:] if len(prompt) > 100 else prompt}")
+            if system_prompt:
+                system_logger.debug(f"System prompt first 100 chars: {system_prompt[:100]}")
+        except Exception as e:
+            system_logger.error(f"Error in logging prompt: {e}")
+        
         url = f"{self.base_url}/generate"
         
-        # Prepare request data
+        # Prepare request data - careful to avoid any string manipulation
         request_data = {
             "model": self.model,
-            "prompt": prompt,  # Don't modify the prompt string
+            "prompt": prompt,
             "temperature": temperature,
             "stream": stream
         }
@@ -74,32 +71,42 @@ class OllamaClient:
             request_data["max_tokens"] = max_tokens
         
         try:
-            # For streaming, return a generator
-            if stream:
-                return self._stream_response(url, request_data)
-            
-            # For non-streaming, return the complete response
-            response = requests.post(url, json=request_data)
-            response.raise_for_status()
-            
-            result = response.json()
-            generated_text = result.get("response", "")
-            
-            # Log token usage if available
-            if "eval_count" in result:
-                system_logger.info(f"Generated {result['eval_count']} tokens")
+            # For non-streaming
+            if not stream:
+                # Log the request we're about to make
+                system_logger.debug("Sending request to Ollama")
                 
-            return generated_text
+                # Make the request
+                response = requests.post(url, json=request_data)
+                
+                # Log the response status
+                system_logger.debug(f"Response status: {response.status_code}")
+                
+                # Raise for any HTTP errors
+                response.raise_for_status()
+                
+                # Parse the response
+                result = response.json()
+                generated_text = result.get("response", "")
+                
+                # Log success
+                system_logger.debug("Successfully generated text")
+                
+                return generated_text
+                
+            # For streaming (existing code)
+            return self._stream_response(url, request_data)
             
-        except requests.exceptions.RequestException as e:
-            system_logger.error(f"Error generating text: {e}")
+        except Exception as e:
+            system_logger.error(f"Detailed error in generate: {str(e)}")
+            # Return a simple error message (no formatting)
+            error_msg = "Error generating text: " + str(e)
             if stream:
-                # Return an error message via the generator
                 def error_generator():
-                    yield f"Error generating text: {e}"
+                    yield error_msg
                 return error_generator()
             else:
-                return f"Error generating text: {e}"
+                return error_msg
     
     def _stream_response(self, url: str, request_data: Dict[str, Any]) -> Generator[str, None, None]:
         """Stream the response from Ollama."""
