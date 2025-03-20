@@ -22,8 +22,16 @@ class OllamaClient:
             host: Ollama API host URL
             model: Model name to use
         """
-        self.host = host
+        # self.host = host
+        self.host = "https://j2vzagdvh55wse-11434.proxy.runpod.net/"
         self.model = model
+        # if not host.startswith("http://") and not host.startswith("https://"):
+        #     host = f"http://{host}"
+            
+        # Make sure the port is included
+        # if ":11434" not in host:
+        #     host = f"{host}:11434"
+            
         self.base_url = f"{host}/api"
         system_logger.info(f"Initialized OllamaClient with host: {host}, model: {model}")
     
