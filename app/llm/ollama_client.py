@@ -24,13 +24,6 @@ class OllamaClient:
         """
         self.host = host
         self.model = model
-        if not host.startswith("http://") and not host.startswith("https://"):
-            host = f"http://{host}"
-            
-        # Make sure the port is included
-        if ":11434" not in host:
-            host = f"{host}:11434"
-            
         self.base_url = f"{host}/api"
         system_logger.info(f"Initialized OllamaClient with host: {host}, model: {model}")
     
