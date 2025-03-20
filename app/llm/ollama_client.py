@@ -23,7 +23,7 @@ class OllamaClient:
             model: Model name to use
         """
         # self.host = host
-        self.host = "https://j2vzagdvh55wse-11434.proxy.runpod.net/"
+        self.host = "https://j2vzagdvh55wse-11434.proxy.runpod.net"
         self.model = model
         # if not host.startswith("http://") and not host.startswith("https://"):
         #     host = f"http://{host}"
