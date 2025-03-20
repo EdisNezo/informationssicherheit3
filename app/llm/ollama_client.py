@@ -3,13 +3,13 @@ Ollama client module for interacting with the Ollama LLM service.
 This module handles sending prompts to the LLM and processing the responses.
 """
 
-import json
 import requests
 from typing import Dict, List, Any, Optional, Union, Generator
-import time
+import json
 
 from app.config import OLLAMA_HOST, OLLAMA_MODEL
 from app.utils import system_logger, time_operation
+from app.diagnostics import fix_prompt, inspect_string, diagnostics_logger
 
 class OllamaClient:
     """Client for interacting with the Ollama LLM service."""
@@ -22,18 +22,20 @@ class OllamaClient:
             host: Ollama API host URL
             model: Model name to use
         """
-        # self.host = host
-        self.host = "https://j2vzagdvh55wse-11434.proxy.runpod.net"
+        self.host = host
         self.model = model
-        # if not host.startswith("http://") and not host.startswith("https://"):
-        #     host = f"http://{host}"
-            
-        # Make sure the port is included
-        # if ":11434" not in host:
-        #     host = f"{host}:11434"
+        
+        # Ensure host has proper format with protocol and port
+        if not host.startswith("http://") and not host.startswith("https://"):
+            host = f"http://{host}"
+        
+        if ":11434" not in host and not host.endswith("/"):
+            host = f"{host}:11434"
+        elif host.endswith("/"):
+            host = host[:-1]
             
         self.base_url = f"{host}/api"
-        system_logger.info(f"Initialized OllamaClient with host: {host}, model: {model}")
+        system_logger.info(f"Initialized OllamaClient with host: {host}, model: {model}, base_url: {self.base_url}")
     
     def _check_health(self) -> bool:
         """Check if the Ollama service is healthy and available."""
@@ -51,70 +53,80 @@ class OllamaClient:
                 temperature: float = 0.7,
                 max_tokens: Optional[int] = None,
                 stream: bool = False) -> Union[str, Generator[str, None, None]]:
+        """
+        Generate text from the LLM with comprehensive safety checks.
         
-        # Debug logging
-        try:
-            system_logger.debug(f"Prompt first 100 chars: {prompt[:100]}")
-            system_logger.debug(f"Prompt last 100 chars: {prompt[-100:] if len(prompt) > 100 else prompt}")
-            if system_prompt:
-                system_logger.debug(f"System prompt first 100 chars: {system_prompt[:100]}")
-        except Exception as e:
-            system_logger.error(f"Error in logging prompt: {e}")
+        Args:
+            prompt: User prompt
+            system_prompt: Optional system prompt
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            stream: Whether to stream the response
+            
+        Returns:
+            Generated text or generator yielding text chunks if streaming
+        """
+        # Diagnostic logging
+        diagnostics_logger.info(f"Generate called with prompt length: {len(prompt) if prompt else 0}")
+        inspect_string(prompt, "prompt")
+        if system_prompt:
+            inspect_string(system_prompt, "system_prompt")
+        
+        # Fix potential format specifiers in prompt
+        safe_prompt = fix_prompt(prompt)
+        safe_system_prompt = fix_prompt(system_prompt) if system_prompt else None
         
         url = f"{self.base_url}/generate"
+        diagnostics_logger.info(f"Request URL: {url}")
         
-        # Prepare request data - careful to avoid any string manipulation
+        # Prepare request data
         request_data = {
             "model": self.model,
-            "prompt": prompt,
+            "prompt": safe_prompt,
             "temperature": temperature,
             "stream": stream
         }
         
         # Add optional parameters
-        if system_prompt:
-            request_data["system"] = system_prompt
+        if safe_system_prompt:
+            request_data["system"] = safe_system_prompt
             
         if max_tokens:
             request_data["max_tokens"] = max_tokens
         
         try:
-            # For non-streaming
-            if not stream:
-                # Log the request we're about to make
-                system_logger.debug("Sending request to Ollama")
+            diagnostics_logger.info("Sending request to Ollama")
+            
+            # For streaming, return a generator
+            if stream:
+                diagnostics_logger.info("Using streaming mode")
+                return self._stream_response(url, request_data)
+            
+            # For non-streaming, return the complete response
+            diagnostics_logger.info("Using non-streaming mode")
+            response = requests.post(url, json=request_data)
+            
+            diagnostics_logger.info(f"Response status: {response.status_code}")
+            
+            # Check for errors
+            if response.status_code != 200:
+                error_msg = f"Ollama returned status code {response.status_code}: {response.text}"
+                diagnostics_logger.error(error_msg)
+                return error_msg
                 
-                # Make the request
-                response = requests.post(url, json=request_data)
+            result = response.json()
+            generated_text = result.get("response", "")
+            
+            # Log token usage if available
+            if "eval_count" in result:
+                diagnostics_logger.info(f"Generated {result['eval_count']} tokens")
                 
-                # Log the response status
-                system_logger.debug(f"Response status: {response.status_code}")
-                
-                # Raise for any HTTP errors
-                response.raise_for_status()
-                
-                # Parse the response
-                result = response.json()
-                generated_text = result.get("response", "")
-                
-                # Log success
-                system_logger.debug("Successfully generated text")
-                
-                return generated_text
-                
-            # For streaming (existing code)
-            return self._stream_response(url, request_data)
+            return generated_text
             
         except Exception as e:
-            system_logger.error(f"Detailed error in generate: {str(e)}")
-            # Return a simple error message (no formatting)
-            error_msg = "Error generating text: " + str(e)
-            if stream:
-                def error_generator():
-                    yield error_msg
-                return error_generator()
-            else:
-                return error_msg
+            error_details = f"Error generating text: {str(e)}\n{traceback.format_exc()}"
+            diagnostics_logger.error(error_details)
+            return f"Error generating text: {str(e)}"
     
     def _stream_response(self, url: str, request_data: Dict[str, Any]) -> Generator[str, None, None]:
         """Stream the response from Ollama."""

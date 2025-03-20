@@ -8,6 +8,7 @@ import json
 
 from app.config import TEMPLATE_STRUCTURE
 from app.utils import system_logger
+from app.diagnostics import safe_format, SafeFormatter
 
 class PromptBuilder:
     """Builder for constructing prompts for the LLM."""
@@ -15,6 +16,7 @@ class PromptBuilder:
     def __init__(self):
         """Initialize the prompt builder."""
         system_logger.info("Initializing PromptBuilder")
+        self.formatter = SafeFormatter()
     
     def build_system_prompt(self) -> str:
         """
@@ -98,21 +100,22 @@ class PromptBuilder:
             
         skill_level = session_context.get("skill_level", "Mittel")
         
-        # Create template structure
-        template_structure = json.dumps(TEMPLATE_STRUCTURE, indent=2)
+        # Create template structure - convert to string safely
+        template_structure = self.formatter.safe_json_dumps(TEMPLATE_STRUCTURE, indent=2)
         
-        prompt = f"""
+        # Build the prompt using safe formatting
+        prompt = safe_format("""
         # TASK
-        Create a comprehensive information security training script for {audience_str} working in a {facility_type}. The script should follow a specific 7-step template format and focus on {threats_str}.
+        Create a comprehensive information security training script for {audience} working in a {facility}. The script should follow a specific 7-step template format and focus on {threats}.
 
         # CONTEXT
-        - Facility Type: {facility_type}
-        - Target Audience: {audience_str}
+        - Facility Type: {facility}
+        - Target Audience: {audience}
         - Training Duration: {duration} minutes
-        - Focus Threats: {threats_str}
+        - Focus Threats: {threats}
         - Technical Skill Level: {skill_level}
-        - Additional Context: {session_context.get("custom_scenarios", "")}
-        - Regulatory Requirements: {session_context.get("regulatory_requirements", "")}
+        - Additional Context: {custom_scenarios}
+        - Regulatory Requirements: {regulatory_requirements}
 
         # TEMPLATE STRUCTURE
         The script must follow this 7-step competency-based template:
@@ -122,8 +125,8 @@ class PromptBuilder:
 
         # INSTRUCTIONS
         1. Create a complete training script following the 7-step template above
-        2. Tailor the content specifically for {audience_str} in a {facility_type}
-        3. Focus on {threats_str} as the primary security concerns
+        2. Tailor the content specifically for {audience} in a {facility}
+        3. Focus on {threats} as the primary security concerns
         4. Design for a {duration}-minute training session
         5. Adjust technical depth based on the {skill_level} skill level
         6. Include realistic examples and scenarios relevant to medical contexts
@@ -138,7 +141,17 @@ class PromptBuilder:
         {retrieved_context}
 
         # BEGIN SCRIPT
-        """
+        """,
+        audience=audience_str,
+        facility=facility_type,
+        duration=duration,
+        threats=threats_str,
+        skill_level=skill_level,
+        custom_scenarios=session_context.get("custom_scenarios", ""),
+        regulatory_requirements=session_context.get("regulatory_requirements", ""),
+        template_structure=template_structure,
+        retrieved_context=retrieved_context
+        )
         
         return prompt
     

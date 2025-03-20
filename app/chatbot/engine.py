@@ -301,8 +301,13 @@ class ChatbotEngine:
     @time_operation
     def _generate_script(self, session_id: str) -> str:
         """Generate the complete training script."""
+        from app.diagnostics import diagnostics_logger, fix_prompt
+        
         session = self.active_sessions[session_id]
         strategic_responses = session.get("strategic_responses", {})
+        
+        # Log that we're starting generation
+        diagnostics_logger.info(f"Starting script generation for session {session_id}")
         
         # Prepare the session context from strategic responses
         session_context = {}
@@ -312,8 +317,7 @@ class ChatbotEngine:
                 response = strategic_responses[question_id]
                 session_context[question_id] = response
         
-        # Log the generation request
-        system_logger.info(f"Generating script for session {session_id} with context: {json.dumps(session_context)}")
+        diagnostics_logger.info(f"Session context prepared with keys: {list(session_context.keys())}")
         
         # Update the stage to indicate generation is in progress
         session["stage"] = "generating"
@@ -340,24 +344,29 @@ class ChatbotEngine:
                 threat_info=threat_info
             )
             
-            # Format the retrieved content for the prompt
             formatted_context = rag_controller.format_retrieved_content_for_prompt(combined_context)
+            diagnostics_logger.info(f"Formatted context length: {len(formatted_context)}")
             
             # Build the script generation prompt
             script_prompt = prompt_builder.build_script_generation_prompt(
                 session_context=session_context,
                 retrieved_context=formatted_context
             )
+            diagnostics_logger.info(f"Built script generation prompt, length: {len(script_prompt)}")
             
             # Get system prompt
             system_prompt = prompt_builder.build_system_prompt()
+            diagnostics_logger.info(f"Built system prompt, length: {len(system_prompt)}")
             
             # Generate the script
+            diagnostics_logger.info("Calling ollama_client.generate")
             generated_script = ollama_client.generate(
                 prompt=script_prompt,
                 system_prompt=system_prompt,
                 temperature=0.7
             )
+            
+            diagnostics_logger.info(f"Generation complete, script length: {len(generated_script) if isinstance(generated_script, str) else 'N/A'}")
             
             # Store the generated script
             session["generated_script"] = generated_script
@@ -396,6 +405,7 @@ class ChatbotEngine:
             return response
             
         except Exception as e:
+            diagnostics_logger.error(f"Error in _generate_script: {str(e)}\n{traceback.format_exc()}")
             system_logger.error(f"Error generating script for session {session_id}: {e}")
             
             # Update stage to indicate failure

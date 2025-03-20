@@ -233,6 +233,8 @@ class RAGController:
         Returns:
             Formatted string for inclusion in prompt
         """
+        from app.diagnostics import fix_prompt
+        
         prompt_parts = []
         
         # Format strategic context
@@ -331,6 +333,9 @@ class RAGController:
         # Format all parts into a single string
         formatted_content = "\n\n".join(prompt_parts)
         
+        # Make the content safe for formatting
+        safe_formatted_content = fix_prompt(formatted_content)
+        
         # Implement hallucination management if enabled
         if HALLUCINATION_MANAGEMENT["source_attribution"]:
             formatted_content += "\n\n# SOURCE ATTRIBUTION\n"
@@ -362,7 +367,7 @@ class RAGController:
                         title = metadata.get("title", threat.get("id", "Untitled threat"))
                         formatted_content += f"- {title} ({source})\n"
         
-        return formatted_content
+        return safe_formatted_content
     
     def extract_relevant_threat_patterns(self, strategic_context: Dict[str, Any]) -> Dict[str, Any]:
         """
