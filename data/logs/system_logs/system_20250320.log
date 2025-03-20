@@ -1,0 +1,49 @@
+2025-03-20 17:46:16,456 - system - INFO - Initialized OllamaClient with host: http://localhost:11434, model: mistral
+2025-03-20 17:46:16,458 - system - INFO - Initializing PromptBuilder
+2025-03-20 17:46:22,701 - system - INFO - Initializing EmbeddingManager with model: all-MiniLM-L6-v2
+2025-03-20 17:46:36,592 - system - INFO - Embedding model loaded successfully. Dimension: 384
+2025-03-20 17:46:36,593 - system - INFO - Initializing VectorStore at /home/edisnezo/UNI/informationssicherheit3/data/vectors/index
+2025-03-20 17:46:37,236 - system - INFO - ChromaDB client initialized successfully
+2025-03-20 17:46:37,326 - system - INFO - Vector store collections initialized successfully
+2025-03-20 17:46:37,327 - system - INFO - Initializing RAG Controller
+2025-03-20 17:46:37,329 - system - INFO - Initializing ChatbotEngine
+2025-03-20 17:46:37,331 - system - INFO - Initialized DocumentLoader with docs_dir: /home/edisnezo/UNI/informationssicherheit3/data/documents
+2025-03-20 17:48:23,560 - system - INFO - Initialized OllamaClient with host: http://localhost:11434, model: mistral
+2025-03-20 17:48:23,561 - system - INFO - Initializing PromptBuilder
+2025-03-20 17:48:28,105 - system - INFO - Initializing EmbeddingManager with model: all-MiniLM-L6-v2
+2025-03-20 17:48:29,847 - system - INFO - Embedding model loaded successfully. Dimension: 384
+2025-03-20 17:48:29,848 - system - INFO - Initializing VectorStore at /home/edisnezo/UNI/informationssicherheit3/data/vectors/index
+2025-03-20 17:48:30,022 - system - INFO - ChromaDB client initialized successfully
+2025-03-20 17:48:30,029 - system - INFO - Vector store collections initialized successfully
+2025-03-20 17:48:30,029 - system - INFO - Initializing RAG Controller
+2025-03-20 17:48:30,030 - system - INFO - Initializing ChatbotEngine
+2025-03-20 17:48:30,030 - system - INFO - Initialized DocumentLoader with docs_dir: /home/edisnezo/UNI/informationssicherheit3/data/documents
+2025-03-20 17:48:30,042 - system - INFO - Found 1 files in directory /home/edisnezo/UNI/informationssicherheit3/data/documents/examples
+2025-03-20 17:48:30,188 - system - INFO - Added 1 documents to collection 'templates'
+2025-03-20 17:48:30,189 - system - INFO - Added 1 documents to collection 'templates'
+2025-03-20 17:48:30,189 - system - INFO - Found 1 files in directory /home/edisnezo/UNI/informationssicherheit3/data/documents/templates
+2025-03-20 17:48:30,279 - system - INFO - Added 1 documents to collection 'templates'
+2025-03-20 17:48:30,279 - system - INFO - Added 1 documents to collection 'templates'
+2025-03-20 17:48:30,635 - system - INFO - Added 9 documents to collection 'threats'
+2025-03-20 17:48:30,636 - system - INFO - Added 9 threat vectors from /home/edisnezo/UNI/informationssicherheit3/data/documents/threats/threat_map.json
+2025-03-20 17:48:45,781 - system - INFO - Initialized OllamaClient with host: http://localhost:11434, model: mistral
+2025-03-20 17:48:45,781 - system - INFO - Initializing PromptBuilder
+2025-03-20 17:48:50,060 - system - INFO - Initializing EmbeddingManager with model: all-MiniLM-L6-v2
+2025-03-20 17:48:51,665 - system - INFO - Embedding model loaded successfully. Dimension: 384
+2025-03-20 17:48:51,665 - system - INFO - Initializing VectorStore at /home/edisnezo/UNI/informationssicherheit3/data/vectors/index
+2025-03-20 17:48:51,836 - system - INFO - ChromaDB client initialized successfully
+2025-03-20 17:48:51,842 - system - INFO - Vector store collections initialized successfully
+2025-03-20 17:48:51,842 - system - INFO - Initializing RAG Controller
+2025-03-20 17:48:51,842 - system - INFO - Initializing ChatbotEngine
+2025-03-20 17:48:51,843 - system - INFO - Initialized DocumentLoader with docs_dir: /home/edisnezo/UNI/informationssicherheit3/data/documents
+2025-03-20 17:48:56,330 - system - INFO - Created new session with ID: e3503db6-703a-410e-96f6-e51a2edf2bee
+2025-03-20 17:54:30,822 - system - INFO - Generating script for session e3503db6-703a-410e-96f6-e51a2edf2bee with context: {"facility_type": "Ich bin verantwortlich f\u00fcr ein kleines Krankenhaus", "target_audience": "Es sollen \u00c4rzte geschult werden", "duration": "Sie darf 10 Minuten gehen", "focus_threats": "Patientenakten, Sicherer Umgang mit technischen Ger\u00e4ten", "skill_level": "Niedrig", "regulatory_requirements": "Anforderungen die allgemein f\u00fcr Krankenh\u00e4user in Deutschland geleten", "custom_scenarios": "Umgang mit Patientendaten"}
+2025-03-20 17:54:30,823 - system - INFO - Retrieving context for query: Security training for Ich bin verantwortlich für e...
+2025-03-20 17:54:30,880 - system - INFO - Found 0 results in collection 'papers' for query: Security training for Ich bin verantwortlich für e...
+2025-03-20 17:54:30,924 - system - INFO - Found 2 results in collection 'templates' for query: Security training for Ich bin verantwortlich für e...
+2025-03-20 17:54:30,962 - system - INFO - Found 3 results in collection 'threats' for query: Security training for Ich bin verantwortlich für e...
+2025-03-20 17:54:30,988 - system - INFO - Found 0 results in collection 'templates' for query: template example for seven_step Patientenakten, Si...
+2025-03-20 17:54:31,013 - system - INFO - Found 0 results in collection 'threats' for query: Patientenakten, Sicherer Umgang mit technischen Ge...
+2025-03-20 17:54:31,014 - system - INFO - Combined 5 documents for context generation
+2025-03-20 17:54:31,099 - system - ERROR - Error generating text: 500 Server Error: Internal Server Error for url: http://localhost:11434/api/generate
+2025-03-20 17:54:31,099 - system - ERROR - Error generating script for session e3503db6-703a-410e-96f6-e51a2edf2bee: Invalid format specifier
