@@ -8,7 +8,6 @@ import json
 
 from app.config import TEMPLATE_STRUCTURE
 from app.utils import system_logger
-from app.diagnostics import safe_format, SafeFormatter
 
 class PromptBuilder:
     """Builder for constructing prompts for the LLM."""
@@ -16,7 +15,6 @@ class PromptBuilder:
     def __init__(self):
         """Initialize the prompt builder."""
         system_logger.info("Initializing PromptBuilder")
-        self.formatter = SafeFormatter()
     
     def build_system_prompt(self) -> str:
         """
@@ -26,23 +24,24 @@ class PromptBuilder:
             System prompt string
         """
         return """
-        You are an expert instructional designer specializing in information security training for medical contexts. 
-        Your role is to create high-quality, competency-based training scripts that follow a specific 7-step template.
+        Du bist ein erfahrener Instructional Designer, spezialisiert auf Schulungen zur Informationssicherheit im medizinischen Kontext.
+        Deine Aufgabe ist es, hochwertige, kompetenzbasierte Schulungsskripte zu erstellen, die einem spezifischen 7-Stufen-Template folgen.
 
-        You incorporate elements of Social Learning Theory (SLT) and Protection Motivation Theory (PMT) in your scripts:
-        - SLT: Include scenarios where people learn by observing others' behaviors and consequences
-        - PMT: Include realistic threat assessments and efficacy information to motivate protective actions
+        Du integrierst Elemente der Sozialen Lerntheorie (SLT) und der Schutzmotivationstheorie (PMT) in deine Skripte:
+        - SLT: Einbeziehung von Szenarien, in denen Menschen durch Beobachtung des Verhaltens anderer und dessen Konsequenzen lernen
+        - PMT: Einbeziehung realistischer Bedrohungsbeurteilungen und Wirksamkeitsinformationen zur Motivation von Schutzmaßnahmen
 
-        Follow these principles:
-        1. Use clear, concise language suited for healthcare professionals
-        2. Include realistic examples relevant to medical environments
-        3. Be specific about threats, their impacts, and mitigation steps
-        4. Avoid jargon unless necessary and explain it when used
-        5. Focus on practical, actionable advice
-        6. Include step-by-step instructions for complex tasks
-        7. Present content in a logical progression
+        Befolge diese Prinzipien:
+        1. Verwende klare, präzise Sprache, die für medizinisches Fachpersonal geeignet ist
+        2. Beziehe realistische Beispiele ein, die für medizinische Umgebungen relevant sind
+        3. Sei spezifisch bei der Beschreibung von Bedrohungen, ihren Auswirkungen und Gegenmaßnahmen
+        4. Vermeide Fachjargon, es sei denn, er ist notwendig, und erkläre ihn, wenn er verwendet wird
+        5. Konzentriere dich auf praktische, umsetzbare Ratschläge
+        6. Füge Schritt-für-Schritt-Anleitungen für komplexe Aufgaben ein
+        7. Präsentiere den Inhalt in einer logischen Abfolge
+        8. Achte darauf, dass das gesamte Skript zwischen 1500 und 2000 Wörtern umfasst
 
-        Your scripts should be text-only, without images or multimedia elements.
+        Deine Skripte sollten ausschließlich auf Deutsch sein und reinen Text enthalten, ohne Bilder oder Multimediaelemente.
         """
     
     def build_chat_system_prompt(self) -> str:
@@ -62,7 +61,6 @@ class PromptBuilder:
         3. The desired length and depth of training
         4. Specific security concerns and threats that should be addressed
         5. Any regulatory requirements that must be covered
-        6. Any previous security incidents or patterns that should inform the training
 
         Be friendly but professional. Ask one question at a time and wait for a response.
         Take note of all relevant information provided, even if not in direct response to a question.
@@ -100,82 +98,56 @@ class PromptBuilder:
             
         skill_level = session_context.get("skill_level", "Mittel")
         
-        # Create template structure - convert to string safely
-        template_structure = self.formatter.safe_json_dumps(TEMPLATE_STRUCTURE, indent=2)
+        # Create template structure
+        template_structure = json.dumps(TEMPLATE_STRUCTURE, indent=2)
         
-        # Build the prompt using safe formatting
-        prompt = safe_format("""
+        # Escape all percent signs in the retrieved context to prevent format specifier errors
+        safe_retrieved_context = retrieved_context.replace("%", "%%")
+        
+        prompt = f"""
         # TASK
-        Create a comprehensive information security training script for {audience} working in a {facility}. The script should follow a specific 7-step template format and focus on {threats}.
+        Erstelle ein umfassendes Schulungsskript zum Thema Informationssicherheit für {audience_str} in einer {facility_type}. Das Skript soll dem 7-Stufen-Template folgen und sich auf {threats_str} konzentrieren.
 
-        # CONTEXT
-        - Facility Type: {facility}
-        - Target Audience: {audience}
-        - Training Duration: {duration} minutes
-        - Focus Threats: {threats}
-        - Technical Skill Level: {skill_level}
-        - Additional Context: {custom_scenarios}
-        - Regulatory Requirements: {regulatory_requirements}
+        # ANFORDERUNGEN
+        - Das Schulungsskript muss auf Deutsch verfasst sein
+        - Der Gesamtumfang soll zwischen 1500 und 2000 Wörtern liegen (wichtig!)
+        - Verteile den Inhalt gleichmäßig auf alle sieben Abschnitte
+        - Jeder Abschnitt sollte etwa 200-250 Wörter umfassen
 
-        # TEMPLATE STRUCTURE
-        The script must follow this 7-step competency-based template:
+        # KONTEXT
+        - Einrichtungstyp: {facility_type}
+        - Zielgruppe: {audience_str}
+        - Schulungsdauer: {duration} Minuten
+        - Schwerpunkt-Bedrohungen: {threats_str}
+        - Technisches Niveau: {skill_level}
+        - Zusätzlicher Kontext: {session_context.get("custom_scenarios", "")}
+        - Regulatorische Anforderungen: {session_context.get("regulatory_requirements", "")}
+
+        # TEMPLATE-STRUKTUR
+        Das Skript muss dieser 7-stufigen kompetenzbasierten Vorlage folgen:
         ```json
         {template_structure}
         ```
 
-        # INSTRUCTIONS
-        1. Create a complete training script following the 7-step template above
-        2. Tailor the content specifically for {audience} in a {facility}
-        3. Focus on {threats} as the primary security concerns
-        4. Design for a {duration}-minute training session
-        5. Adjust technical depth based on the {skill_level} skill level
-        6. Include realistic examples and scenarios relevant to medical contexts
-        7. Incorporate elements of Social Learning Theory (learning through observation) and Protection Motivation Theory (realistic threat assessment and coping measures)
-        8. Use clear, concise language appropriate for healthcare professionals
-        9. Include step-by-step instructions for security practices
-        10. Make the content engaging and memorable
+        # ANWEISUNGEN
+        1. Erstelle ein vollständiges Schulungsskript nach der oben genannten 7-Stufen-Vorlage
+        2. Passe den Inhalt speziell für {audience_str} in einer {facility_type} an
+        3. Konzentriere dich auf {threats_str} als primäre Sicherheitsbedrohungen
+        4. Gestalte das Skript für eine {duration}-minütige Schulung
+        5. Passe die technische Tiefe an das Niveau {skill_level} an
+        6. Integriere realistische Beispiele und Szenarien aus dem medizinischen Kontext
+        7. Baue Elemente der Sozialen Lerntheorie (Lernen durch Beobachtung) und der Schutzmotivationstheorie (realistische Bedrohungseinschätzung und Bewältigungsmaßnahmen) ein
+        8. Verwende klare, präzise Sprache, die für medizinisches Fachpersonal geeignet ist
+        9. Füge Schritt-für-Schritt-Anleitungen für Sicherheitsmaßnahmen ein
+        10. Gestalte den Inhalt ansprechend und einprägsam
+        11. Halte dich unbedingt an die Wortanzahl von 1500-2000 Wörtern insgesamt
 
-        # OUTPUT FORMAT
-        Provide the complete script with clear section headings following the 7-step template. Each section should be comprehensive and detailed.
+        # AUSGABEFORMAT
+        Liefere das vollständige Skript mit klaren Abschnittsüberschriften gemäß der 7-Stufen-Vorlage. Jeder Abschnitt sollte umfassend und detailliert sein, aber zusammen die Gesamtwortanzahl von 1500-2000 Wörtern nicht überschreiten oder unterschreiten.
 
-        {retrieved_context}
+        {safe_retrieved_context}
 
-        # BEGIN SCRIPT
-        """,
-        audience=audience_str,
-        facility=facility_type,
-        duration=duration,
-        threats=threats_str,
-        skill_level=skill_level,
-        custom_scenarios=session_context.get("custom_scenarios", ""),
-        regulatory_requirements=session_context.get("regulatory_requirements", ""),
-        template_structure=template_structure,
-        retrieved_context=retrieved_context
-        )
-        
-        return prompt
-    
-    def build_strategic_question_prompt(self, question: Dict[str, Any]) -> str:
-        """
-        Build a prompt for a strategic question to collect requirements.
-        
-        Args:
-            question: Question dictionary with 'id', 'question', and 'description'
-            
-        Returns:
-            Prompt for the strategic question
-        """
-        question_text = question.get("question", "")
-        description = question.get("description", "")
-        
-        prompt = f"""
-        # STRATEGIC QUESTION
-        {question_text}
-        
-        # DESCRIPTION
-        {description}
-        
-        Please provide a thoughtful and detailed response to this question. Your answer will help me create a customized information security training script tailored to your specific needs and context.
+        # SKRIPT ANFANG
         """
         
         return prompt
@@ -214,6 +186,9 @@ class PromptBuilder:
             threats_str = ", ".join(focus_threats) if focus_threats else "general security threats"
         else:
             threats_str = str(focus_threats)
+        
+        # Escape all percent signs in the retrieved context to prevent format specifier errors
+        safe_retrieved_context = retrieved_context.replace("%", "%%")
         
         # Build section-specific instructions
         section_instructions = ""
@@ -302,7 +277,7 @@ class PromptBuilder:
         - Facility Type: {facility_type}
         - Focus Threats: {threats_str}
         
-        {retrieved_context}
+        {safe_retrieved_context}
 
         # WRITE THE COMPLETE SECTION CONTENT BELOW
         ## {section_title}
@@ -381,15 +356,19 @@ class PromptBuilder:
         Returns:
             Customization prompt
         """
+        # Escape percent signs to prevent format issues
+        safe_base_content = base_content.replace("%", "%%")
+        safe_customization_request = customization_request.replace("%", "%%")
+        
         prompt = f"""
         # CONTENT CUSTOMIZATION TASK
         Modify the following training script content based on the customization request.
 
         # ORIGINAL CONTENT
-        {base_content}
+        {safe_base_content}
 
         # CUSTOMIZATION REQUEST
-        {customization_request}
+        {safe_customization_request}
 
         # INSTRUCTIONS
         1. Carefully review the original content and the customization request
@@ -404,8 +383,8 @@ class PromptBuilder:
         return prompt
     
     def build_hallucination_check_prompt(self, 
-                                   generated_content: str, 
-                                   retrieved_context: str) -> str:
+                                       generated_content: str, 
+                                       retrieved_context: str) -> str:
         """
         Build a prompt for checking generated content for potential hallucinations.
         
@@ -416,7 +395,7 @@ class PromptBuilder:
         Returns:
             Hallucination check prompt
         """
-        # Wir müssen alle % Zeichen escapen, um Probleme mit Format-Spezifizierern zu vermeiden
+        # Escape percent signs to prevent format issues
         safe_generated_content = generated_content.replace("%", "%%")
         safe_retrieved_context = retrieved_context.replace("%", "%%")
         
@@ -433,38 +412,34 @@ class PromptBuilder:
         # INSTRUCTIONS
         1. Compare the generated content against the retrieved context
         2. Identify any statements in the generated content that:
-        - Contradict information in the retrieved context
-        - Make specific factual claims not supported by the retrieved context
-        - Introduce terminology, procedures, or concepts not present in the retrieved context
+           - Contradict information in the retrieved context
+           - Make specific factual claims not supported by the retrieved context
+           - Introduce terminology, procedures, or concepts not present in the retrieved context
         3. Ignore stylistic differences and focus only on factual accuracy
         4. For each potential hallucination, provide:
-        - The exact quote from the generated content
-        - Why it appears to be a hallucination
-        - A suggested correction (if possible)
+           - The exact quote from the generated content
+           - Why it appears to be a hallucination
+           - A suggested correction (if possible)
 
         # OUTPUT FORMAT
         Provide your analysis in the following JSON format:
-        ```json
         {{
-        "has_hallucinations": true/false,
-        "hallucinations": [
+          "has_hallucinations": true/false,
+          "hallucinations": [
             {{
-            "text": "quoted text from generated content",
-            "reason": "explanation of why this is a hallucination",
-            "correction": "suggested correction"
+              "text": "quoted text from generated content",
+              "reason": "explanation of why this is a hallucination",
+              "correction": "suggested correction"
             }},
             ...
-        ]
+          ]
         }}
-        ```
 
         If no hallucinations are found, return:
-        ```json
         {{
-        "has_hallucinations": false,
-        "hallucinations": []
+          "has_hallucinations": false,
+          "hallucinations": []
         }}
-        ```
 
         # ANALYSIS
         """

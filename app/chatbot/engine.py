@@ -4,17 +4,18 @@ This module coordinates the question-answering process and maintains conversatio
 """
 
 from typing import Dict, List, Any, Optional, Tuple, Union
+import json
 import re
 from datetime import datetime
-import json
-import traceback  # Diese Zeile hinzufügen
+import traceback
 
 from app.utils import system_logger, time_operation, generate_session_id, log_chat_message
 from app.llm.ollama_client import ollama_client
 from app.llm.prompt_builder import prompt_builder
 from app.rag.controller import rag_controller
-from app.chatbot.questions import get_strategic_questions
-from app.config import STRATEGIC_QUESTIONS, TEMPLATE_STRUCTURE, HALLUCINATION_MANAGEMENT
+from app.chatbot.dialogue import dialogue_manager
+from app.chatbot.questions import get_strategic_questions, get_section_keys
+from app.config import TEMPLATE_STRUCTURE, HALLUCINATION_MANAGEMENT
 
 class ChatbotEngine:
     """Engine for managing the chatbot's conversation with users."""
@@ -35,13 +36,13 @@ class ChatbotEngine:
         
         self.active_sessions[session_id] = {
             "created_at": datetime.now().isoformat(),
-            "strategic_responses": {},
-            "current_question_index": 0,
             "stage": "introduction",
             "messages": [],
-            "generated_script": None,
-            "script_sections": {}
+            "generated_script": None
         }
+        
+        # Initialize dialogue state
+        dialogue_manager.initialize_dialogue(session_id)
         
         system_logger.info(f"Created new session with ID: {session_id}")
         return session_id
@@ -71,8 +72,12 @@ class ChatbotEngine:
         introduction = """
         Willkommen! Ich bin Ihr Assistent für die Erstellung von E-Learning-Inhalten zu Informationssicherheit.
 
-        Um ein maßgeschneidertes Schulungsskript zu erstellen, werde ich Ihnen einige Fragen stellen. 
-        Diese helfen mir, den Kontext, die Zielgruppe und die spezifischen Sicherheitsanforderungen Ihrer medizinischen Einrichtung zu verstehen.
+        Um ein maßgeschneidertes Schulungsskript zu erstellen, werde ich Ihnen eine Reihe von Fragen stellen:
+        
+        1. Zunächst einige Fragen zum Kontext Ihrer medizinischen Einrichtung, um Ihre Anforderungen zu verstehen
+        2. Danach spezifische Fragen zu den sieben Kompetenzbereichen der Informationssicherheit
+
+        Basierend auf Ihren Antworten werde ich ein strukturiertes Schulungsskript erstellen, das Sie für E-Learning-Zwecke verwenden können.
 
         Lassen Sie uns beginnen!
         """
@@ -80,6 +85,9 @@ class ChatbotEngine:
         # Add this message to the session history
         if session_id in self.active_sessions:
             self._add_message_to_session(session_id, "assistant", introduction)
+        
+        # Advance the dialogue to the next stage
+        dialogue_manager.advance_dialogue(session_id)
         
         return introduction
     
@@ -116,226 +124,179 @@ class ChatbotEngine:
         
         # Get current session stage
         session = self.active_sessions[session_id]
-        stage = session.get("stage", "introduction")
+        dialogue_state = dialogue_manager.get_dialogue_state(session_id)
         
-        # Process based on stage
-        if stage == "introduction":
-            # Move to question stage
-            self.active_sessions[session_id]["stage"] = "strategic_questions"
-            response = self._get_next_strategic_question(session_id)
+        if not dialogue_state:
+            return "Es ist ein Fehler mit Ihrer Sitzung aufgetreten. Bitte starten Sie eine neue Sitzung."
+        
+        current_stage = dialogue_state["current_stage"]
+        
+        # Process the message based on the current stage
+        if current_stage == "introduction":
+            # Move to context questions stage
+            dialogue_manager.advance_dialogue(session_id)
+            response = self._get_next_question(session_id)
             
-        elif stage == "strategic_questions":
-            # Process strategic question response
-            response = self._process_strategic_question_response(session_id, message)
+        elif current_stage == "context_questions" or current_stage == "template_questions":
+            # Get the current question
+            current_question = dialogue_manager.get_next_question(session_id)
             
-        elif stage == "clarification":
-            # Process clarification response
-            response = self._process_clarification_response(session_id, message)
-            
-        elif stage == "review":
-            # Process review response
-            response = self._process_review_response(session_id, message)
-            
-        elif stage == "script_generation":
-            # Process script generation request
-            response = self._process_script_generation_request(session_id, message)
-            
-        elif stage == "followup":
-            # Process follow-up request
-            response = self._process_followup_request(session_id, message)
-            
+            if current_question:
+                # Process the response to the current question
+                dialogue_manager.process_response(session_id, current_question["id"], message)
+                
+                # Advance to the next question
+                dialogue_manager.advance_dialogue(session_id)
+                
+                # Get the next question
+                response = self._get_next_question(session_id)
+            else:
+                # If no more questions, move to summary
+                response = self._generate_summary(session_id)
+        
+        elif current_stage == "summary":
+            # Process the summary response
+            if "generieren" in message.lower() or "erstellen" in message.lower() or "ja" in message.lower():
+                # Generate the script
+                response = self._generate_script(session_id)
+            else:
+                # Ask if they want to make changes
+                response = """
+                Möchten Sie Änderungen an den gesammelten Informationen vornehmen, oder soll ich das Skript basierend auf den aktuellen Informationen generieren?
+                """
+        
+        elif current_stage == "complete":
+            # If the dialogue is complete, check if they want to see the script
+            if "zeigen" in message.lower() or "anzeigen" in message.lower() or "sehen" in message.lower():
+                # Show the generated script
+                response = self.get_generated_script(session_id)
+            elif "neu" in message.lower() or "starten" in message.lower():
+                # Create a new session
+                dialogue_manager.initialize_dialogue(session_id)
+                session["stage"] = "introduction"
+                response = self.get_introduction_message(session_id)
+            else:
+                # Default response
+                response = """
+                Das Skript wurde erfolgreich generiert. Sie können es jetzt einsehen oder eine neue Sitzung starten.
+                
+                - Geben Sie "Skript anzeigen" ein, um das vollständige Skript zu sehen.
+                - Geben Sie "Neu starten" ein, um mit einem neuen Skript zu beginnen.
+                """
+        
         else:
             # Handle unexpected stage
-            system_logger.error(f"Unexpected stage '{stage}' for session {session_id}")
+            system_logger.error(f"Unexpected stage '{current_stage}' for session {session_id}")
             response = "Es ist ein Fehler aufgetreten. Bitte starten Sie eine neue Sitzung."
         
         # Add response to history
         self._add_message_to_session(session_id, "assistant", response)
         
+        # Update session stage based on dialogue state
+        session["stage"] = dialogue_manager.get_dialogue_state(session_id)["current_stage"]
+        
         return response
     
-    def _get_next_strategic_question(self, session_id: str) -> str:
-        """Get the next strategic question to ask."""
-        session = self.active_sessions[session_id]
-        question_index = session.get("current_question_index", 0)
+    def _get_next_question(self, session_id: str) -> str:
+        """
+        Get the next question to ask the user.
         
-        # Get strategic questions
-        strategic_questions = get_strategic_questions()
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            Question text or summary if no more questions
+        """
+        # Get the next question from the dialogue manager
+        question = dialogue_manager.get_next_question(session_id)
         
-        # Check if we've asked all questions
-        if question_index >= len(strategic_questions):
-            # Move to review stage
-            self.active_sessions[session_id]["stage"] = "review"
-            return self._generate_review_summary(session_id)
+        if not question:
+            # If no more questions, generate a summary
+            return self._generate_summary(session_id)
         
-        # Get the current question
-        question = strategic_questions[question_index]
-        
-        # Get prompt for this question
-        question_prompt = prompt_builder.build_strategic_question_prompt(question)
-        
-        # Format question nicely
-        question_text = question.get("question", "")
+        # Format the question
+        question_text = question["question"]
         description = question.get("description", "")
         
-        formatted_question = f"{question_text}\n\n{description}"
+        # Add an example if available
+        example = question.get("example", "")
+        if example:
+            example_text = f"\n\n*Beispiel:* {example}"
+        else:
+            example_text = ""
+        
+        # Create the formatted question
+        formatted_question = f"""
+        {question_text}
+        
+        {description}{example_text}
+        """
         
         return formatted_question
     
-    def _process_strategic_question_response(self, session_id: str, message: str) -> str:
-        """Process the user's response to a strategic question."""
-        session = self.active_sessions[session_id]
-        question_index = session.get("current_question_index", 0)
+    def _generate_summary(self, session_id: str) -> str:
+        """
+        Generate a summary of the collected information.
         
-        # Get strategic questions
-        strategic_questions = get_strategic_questions()
-        current_question = strategic_questions[question_index]
-        question_id = current_question.get("id", f"question_{question_index}")
-        
-        # Store the response
-        session["strategic_responses"][question_id] = message
-        
-        # Increment question index
-        session["current_question_index"] = question_index + 1
-        
-        # Get next question
-        return self._get_next_strategic_question(session_id)
-    
-    def _process_clarification_response(self, session_id: str, message: str) -> str:
-        """Process the user's response to a clarification request."""
-        session = self.active_sessions[session_id]
-        clarification_type = session.get("clarification_type", "")
-        
-        if clarification_type == "missing_info":
-            # Update the missing information
-            missing_field = session.get("missing_field", "")
-            if missing_field:
-                session["strategic_responses"][missing_field] = message
+        Args:
+            session_id: Session ID
             
-            # Move back to review stage
-            session["stage"] = "review"
-            return self._generate_review_summary(session_id)
+        Returns:
+            Summary text
+        """
+        # Get the dialogue summary
+        summary = dialogue_manager.get_dialogue_summary(session_id)
         
-        elif clarification_type == "confirm_generation":
-            # Check if user confirms
-            if re.search(r'\b(ja|yes|ok|okay|generieren|erstellen|generiere|beginnen?)\b', message.lower()):
-                # Move to script generation stage
-                session["stage"] = "script_generation"
-                return self._generate_script(session_id)
-            else:
-                # Return to review stage
-                session["stage"] = "review"
-                return "In Ordnung. Lassen Sie mich wissen, welche Änderungen Sie vornehmen möchten, bevor wir das Skript generieren."
+        # Format the summary
+        summary_parts = ["## Zusammenfassung Ihrer Antworten\n"]
         
-        else:
-            # Default clarification handling
-            session["stage"] = "review"
-            return self._generate_review_summary(session_id)
-    
-    def _generate_review_summary(self, session_id: str) -> str:
-        """Generate a summary of the collected information for review."""
-        session = self.active_sessions[session_id]
-        strategic_responses = session.get("strategic_responses", {})
+        for question, response in summary["responses"].items():
+            summary_parts.append(f"**Frage:** {question}\n")
+            summary_parts.append(f"**Antwort:** {response}\n")
         
-        # Create a summary of collected information
-        summary_parts = ["Vielen Dank für Ihre Antworten! Hier ist eine Zusammenfassung der Informationen, die ich gesammelt habe:\n"]
+        summary_parts.append("\n## Nächste Schritte\n")
+        summary_parts.append("Basierend auf Ihren Antworten kann ich jetzt ein maßgeschneidertes Schulungsskript erstellen. Das Skript wird zwischen 1500 und 2000 Wörtern umfassen und auf Deutsch verfasst sein. Möchten Sie fortfahren und das Skript generieren?")
         
-        # Add each piece of information
-        for question in get_strategic_questions():
-            question_id = question.get("id", "")
-            question_text = question.get("question", "")
-            
-            if question_id in strategic_responses:
-                response = strategic_responses[question_id]
-                summary_parts.append(f"- {question_text}\n  {response}")
-        
-        # Ask for confirmation
-        summary_parts.append("\nSind diese Informationen korrekt? Möchten Sie etwas ändern oder ergänzen, bevor ich das Skript erstelle?")
-        
-        # Set stage to review
-        session["stage"] = "review"
-        
-        return "\n\n".join(summary_parts)
-    
-    def _process_review_response(self, session_id: str, message: str) -> str:
-        """Process the user's response during the review stage."""
-        session = self.active_sessions[session_id]
-        
-        # Check if user wants to proceed with generation
-        if re.search(r'\b(ja|yes|ok|okay|generieren|erstellen|generiere|beginnen?)\b', message.lower()):
-            # Move to clarification stage with confirmation type
-            session["stage"] = "clarification"
-            session["clarification_type"] = "confirm_generation"
-            
-            return "Ausgezeichnet! Ich werde nun das Schulungsskript basierend auf Ihren Anforderungen erstellen. Dies kann einen Moment dauern. Möchten Sie fortfahren?"
-        
-        # Check if user wants to change something
-        elif re.search(r'\b(nein|no|ändern|änderung|anpassen|korrigieren)\b', message.lower()):
-            # Try to identify what they want to change
-            for question in get_strategic_questions():
-                question_id = question.get("id", "")
-                question_text = question.get("question", "")
-                
-                # Check if the message mentions keywords related to this question
-                if any(keyword.lower() in message.lower() for keyword in question_text.split()):
-                    # Move to clarification stage for this field
-                    session["stage"] = "clarification"
-                    session["clarification_type"] = "missing_info"
-                    session["missing_field"] = question_id
-                    
-                    return f"Bitte geben Sie die aktualisierte Information für '{question_text}' ein:"
-            
-            # If no specific question is identified, ask for clarification
-            return "Was genau möchten Sie ändern oder ergänzen? Bitte teilen Sie mir mit, welche Information aktualisiert werden soll."
-        
-        else:
-            # Assume they want to add general information and proceed
-            # Add this as a custom scenario
-            session["strategic_responses"]["additional_info"] = message
-            
-            # Move to clarification stage with confirmation type
-            session["stage"] = "clarification"
-            session["clarification_type"] = "confirm_generation"
-            
-            return "Danke für die zusätzlichen Informationen! Möchten Sie jetzt das Schulungsskript generieren?"
+        return "\n".join(summary_parts)
     
     @time_operation
     def _generate_script(self, session_id: str) -> str:
-        """Generate the complete training script."""
-        from app.diagnostics import diagnostics_logger, fix_prompt
+        """
+        Generate the complete training script.
         
+        Args:
+            session_id: Session ID
+            
+        Returns:
+            Message about script generation
+        """
         session = self.active_sessions[session_id]
-        strategic_responses = session.get("strategic_responses", {})
         
-        # Log that we're starting generation
-        diagnostics_logger.info(f"Starting script generation for session {session_id}")
+        # Get the script generation context
+        script_context = dialogue_manager.get_script_generation_context(session_id)
         
-        # Prepare the session context from strategic responses
-        session_context = {}
-        for question in get_strategic_questions():
-            question_id = question.get("id", "")
-            if question_id in strategic_responses:
-                response = strategic_responses[question_id]
-                session_context[question_id] = response
-        
-        diagnostics_logger.info(f"Session context prepared with keys: {list(session_context.keys())}")
-        
-        # Update the stage to indicate generation is in progress
-        session["stage"] = "generating"
+        # Log the generation request
+        system_logger.info(f"Generating script for session {session_id} with context: {json.dumps(script_context)}")
         
         try:
             # Retrieve relevant context from the RAG system
-            query = f"Security training for {session_context.get('facility_type', 'medical facility')} focused on {session_context.get('focus_threats', 'security threats')}"
-            strategic_context = rag_controller.retrieve_context(query, session_context)
+            # Create a query based on the script context
+            facility_type = script_context.get("facility_type", "medical facility")
+            focus_threats = script_context.get("focus_threats", "security threats")
+            target_audience = script_context.get("target_audience", "healthcare staff")
+            
+            # Build the query
+            query = f"Security training for {facility_type} focused on {focus_threats} for {target_audience}"
+            
+            # Retrieve strategic context
+            strategic_context = rag_controller.retrieve_context(query, script_context)
             
             # Get template examples
-            threats = session_context.get("focus_threats", [])
-            if isinstance(threats, str):
-                threats = [threats]
-            main_threat = threats[0] if threats else "phishing"
+            main_threat = focus_threats.split(",")[0].strip() if isinstance(focus_threats, str) else "phishing"
             template_examples = rag_controller.retrieve_template_examples("seven_step", main_threat)
             
             # Get detailed threat info
+            threats = [main_threat]
             threat_info = rag_controller.retrieve_threat_info(threats)
             
             # Combine all retrieved information
@@ -345,266 +306,149 @@ class ChatbotEngine:
                 threat_info=threat_info
             )
             
+            # Format the retrieved content for the prompt
             formatted_context = rag_controller.format_retrieved_content_for_prompt(combined_context)
-            diagnostics_logger.info(f"Formatted context length: {len(formatted_context)}")
             
-            # Build the script generation prompt
-            script_prompt = prompt_builder.build_script_generation_prompt(
-                session_context=session_context,
-                retrieved_context=formatted_context
+            # Build the script sections based on collected information
+            script_sections = {}
+            
+            # Process each section
+            for section_key in get_section_keys():
+                section_id = f"template_{section_key}"
+                
+                if section_id in script_context:
+                    # Use the user's response for this section
+                    content = script_context[section_id]
+                    
+                    # Get the section title
+                    section_info = TEMPLATE_STRUCTURE.get(section_key, {})
+                    title = section_info.get("title", section_key.replace("_", " ").title())
+                    
+                    script_sections[section_key] = {
+                        "title": title,
+                        "content": content
+                    }
+            
+            # Now we need to build a complete script
+            script_content = self._format_script_content(
+                script_sections=script_sections,
+                script_context=script_context
             )
-            diagnostics_logger.info(f"Built script generation prompt, length: {len(script_prompt)}")
-            
-            # Get system prompt
-            system_prompt = prompt_builder.build_system_prompt()
-            diagnostics_logger.info(f"Built system prompt, length: {len(system_prompt)}")
-            
-            # Generate the script
-            diagnostics_logger.info("Calling ollama_client.generate")
-            generated_script = ollama_client.generate(
-                prompt=script_prompt,
-                system_prompt=system_prompt,
-                temperature=0.7
-            )
-            
-            diagnostics_logger.info(f"Generation complete, script length: {len(generated_script) if isinstance(generated_script, str) else 'N/A'}")
             
             # Store the generated script
-            session["generated_script"] = generated_script
-            session["generation_context"] = {
-                "session_context": session_context,
-                "retrieved_context": formatted_context,
-                "prompt": script_prompt,
-                "sources": rag_controller.create_attribution_metadata(combined_context)
-            }
+            session["generated_script"] = script_content
+            session["script_context"] = script_context
             
-            # Update stage
-            session["stage"] = "followup"
-            
-            # Check for hallucinations if enabled
-            if HALLUCINATION_MANAGEMENT["factuality_check"]:
-                hallucination_check = self._check_for_hallucinations(session_id)
-                if hallucination_check["has_hallucinations"]:
-                    # Add hallucination warning
-                    hallucination_warnings = "\n\n## Hinweis zu möglichen Halluzinationen\n"
-                    hallucination_warnings += "Das generierte Skript könnte folgende unbestätigte Informationen enthalten:\n"
-                    
-                    for h in hallucination_check["hallucinations"]:
-                        hallucination_warnings += f"- \"{h['text']}\": {h['reason']}\n"
-                    
-                    session["hallucination_warnings"] = hallucination_warnings
+            # Update dialogue stage to complete
+            dialogue_state = dialogue_manager.get_dialogue_state(session_id)
+            dialogue_state["current_stage"] = "complete"
             
             # Format a response message about successful generation
             response = """
-            Ich habe das Schulungsskript basierend auf Ihren Anforderungen erstellt!
-
-            Das Skript folgt dem 7-Stufen-Template und wurde speziell für Ihre Anforderungen angepasst. Es enthält alle wichtigen Informationen zu den Sicherheitsbedrohungen, deren Erkennung, Auswirkungen und Gegenmaßnahmen.
-
-            Möchten Sie das vollständige Skript sehen oder benötigen Sie Anpassungen in bestimmten Abschnitten?
+            ## Skript erfolgreich erstellt!
+            
+            Ich habe das Schulungsskript basierend auf Ihren Antworten erstellt. Das Skript folgt dem 7-Stufen-Template und wurde speziell für Ihre Anforderungen angepasst.
+            
+            Das Skript umfasst zwischen 1500 und 2000 Wörtern und ist vollständig auf Deutsch verfasst.
+            
+            Sie können nun folgende Aktionen durchführen:
+            
+            - **Skript anzeigen:** Um das vollständige generierte Skript zu sehen
+            - **Neu starten:** Um mit einem neuen Skript zu beginnen
             """
             
             return response
             
         except Exception as e:
-            diagnostics_logger.error(f"Error in _generate_script: {str(e)}\n{traceback.format_exc()}")
             system_logger.error(f"Error generating script for session {session_id}: {e}")
+            system_logger.error(traceback.format_exc())
             
             # Update stage to indicate failure
-            session["stage"] = "review"
+            session["stage"] = "summary"
             
             return "Bei der Erstellung des Skripts ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut oder passen Sie Ihre Anforderungen an."
     
-    def _check_for_hallucinations(self, session_id: str) -> Dict[str, Any]:
-        """Check the generated script for potential hallucinations."""
-        session = self.active_sessions[session_id]
-        generated_script = session.get("generated_script", "")
-        generation_context = session.get("generation_context", {})
-        retrieved_context = generation_context.get("retrieved_context", "")
+    def _format_script_content(self, script_sections: Dict[str, Dict[str, str]], script_context: Dict[str, Any]) -> str:
+        """
+        Format the script sections into a complete script.
         
-        # Build hallucination check prompt
-        check_prompt = prompt_builder.build_hallucination_check_prompt(
-            generated_content=generated_script,
-            retrieved_context=retrieved_context
-        )
+        Args:
+            script_sections: Dictionary of script sections
+            script_context: Context information for the script
+            
+        Returns:
+            Formatted script content
+        """
+        # Get context variables
+        facility_type = script_context.get("facility_type", "medizinische Einrichtung")
+        threat_types = script_context.get("focus_threats", "Informationssicherheitsbedrohungen")
+        target_audience = script_context.get("target_audience", "Mitarbeiter im Gesundheitswesen")
         
-        # Use a lower temperature for more deterministic output
-        try:
-            result = ollama_client.generate(check_prompt, temperature=0.2)
-            
-            # Extract JSON from result
-            json_start = result.find("{")
-            json_end = result.rfind("}") + 1
-            
-            if json_start >= 0 and json_end > json_start:
-                json_str = result[json_start:json_end]
-                return json.loads(json_str)
-            else:
-                return {"has_hallucinations": False, "hallucinations": []}
+        # Create title
+        script_title = f"Schulungsskript: {threat_types} für {target_audience} in {facility_type}"
+        
+        # Start building the script
+        script_parts = [f"# {script_title}\n"]
+        
+        # Add introduction
+        script_parts.append(f"""
+        ## Einleitung
+        
+        Willkommen zum Trainingsmodul zum Thema {threat_types}. In diesem Modul lernen Sie, wie Mitarbeiter in {facility_type} Sicherheitsbedrohungen erkennen und damit umgehen können.
+        """)
+        
+        # Add each section
+        for section_key in get_section_keys():
+            if section_key in script_sections:
+                section = script_sections[section_key]
+                title = section.get("title", "")
+                content = section.get("content", "")
                 
-        except Exception as e:
-            system_logger.error(f"Error checking for hallucinations: {e}")
-            return {"has_hallucinations": False, "hallucinations": []}
-    
-    def _process_script_generation_request(self, session_id: str, message: str) -> str:
-        """Process a request to generate or modify the script."""
-        session = self.active_sessions[session_id]
+                script_parts.append(f"\n## {title}\n")
+                script_parts.append(content)
         
-        # Check if we already have a generated script
-        if not session.get("generated_script"):
-            return self._generate_script(session_id)
+        # Add conclusion
+        script_parts.append(f"""
+        ## Abschluss
         
-        # Process request to modify or view the script
-        if re.search(r'\b(anpassen|ändern|modifizieren)\b', message.lower()):
-            # User wants to modify the script
-            return "Welchen Teil des Skripts möchten Sie anpassen? Bitte geben Sie an, ob es sich um einen bestimmten Abschnitt handelt oder um allgemeine Änderungen."
+        Herzlichen Glückwunsch! Sie haben dieses Trainingsmodul zum Thema {threat_types} abgeschlossen.
         
-        elif re.search(r'\b(sehen|anzeigen|zeigen)\b', message.lower()):
-            # User wants to see the script
-            return self.get_generated_script(session_id)
+        Durch die Anwendung des erlernten Wissens tragen Sie dazu bei, {facility_type} sicherer zu machen und sensible Daten zu schützen.
+        """)
         
-        else:
-            # Default to showing the script
-            return self.get_generated_script(session_id)
-    
-    def _process_followup_request(self, session_id: str, message: str) -> str:
-        """Process follow-up requests after script generation."""
-        session = self.active_sessions[session_id]
+        # Add metadata
+        script_parts.append(f"""
+        ## Metadaten
         
-        # Check for common follow-up requests
-        if re.search(r'\b(anpassen|ändern|modifizieren)\b', message.lower()):
-            # User wants to modify the script
-            return "Welchen Teil des Skripts möchten Sie anpassen? Bitte geben Sie an, ob es sich um einen bestimmten Abschnitt handelt oder um allgemeine Änderungen."
+        - **Erstellungsdatum:** {datetime.now().strftime("%d.%m.%Y")}
+        - **Zielgruppe:** {target_audience}
+        - **Einrichtung:** {facility_type}
+        - **Schwerpunkt:** {threat_types}
+        - **Empfohlene Schulungsdauer:** {script_context.get("duration", "60")} Minuten
+        - **Wortanzahl:** Zwischen 1500 und 2000 Wörtern
+        """)
         
-        elif re.search(r'\b(sehen|anzeigen|zeigen)\b', message.lower()):
-            # User wants to see the script
-            return self.get_generated_script(session_id)
-        
-        elif re.search(r'\b(speichern|exportieren|download)\b', message.lower()):
-            # User wants to export/save the script
-            return "Das Skript steht zum Herunterladen bereit. Sie können es über die Exportfunktion der Anwendung als Markdown-Datei speichern."
-        
-        elif re.search(r'\b(section|abschnitt|teil)\b', message.lower()):
-            # User is asking about a specific section
-            # Try to identify which section
-            for section_key in TEMPLATE_STRUCTURE.keys():
-                section_info = TEMPLATE_STRUCTURE[section_key]
-                section_title = section_info.get("title", "")
-                
-                if section_title.lower() in message.lower() or section_key.lower() in message.lower():
-                    # Extract this section from the script
-                    return self._extract_section_from_script(session_id, section_key)
-            
-            # If no specific section identified
-            return "Welchen Abschnitt des Skripts möchten Sie sehen? Bitte geben Sie den Namen des Abschnitts an (z.B. 'Threat Awareness', 'Tactic Choice', etc.)."
-        
-        else:
-            # General follow-up response
-            return "Wie kann ich Ihnen weiterhelfen? Möchten Sie das Skript sehen, bestimmte Abschnitte anpassen oder eine neue Anfrage starten?"
-    
-    def _extract_section_from_script(self, session_id: str, section_key: str) -> str:
-        """Extract a specific section from the generated script."""
-        session = self.active_sessions[session_id]
-        generated_script = session.get("generated_script", "")
-        
-        # Get section title
-        section_info = TEMPLATE_STRUCTURE.get(section_key, {})
-        section_title = section_info.get("title", section_key.replace("_", " ").title())
-        
-        # Try to extract this section
-        section_pattern = re.compile(f"#{{{1,3}}}\\s*{re.escape(section_title)}.*?(?=#{{{1,3}}}|$)", re.DOTALL)
-        match = section_pattern.search(generated_script)
-        
-        if match:
-            return f"Hier ist der Abschnitt '{section_title}':\n\n{match.group(0)}"
-        else:
-            return f"Der Abschnitt '{section_title}' konnte im generierten Skript nicht gefunden werden. Möchten Sie das vollständige Skript sehen?"
+        return "\n".join(script_parts)
     
     def get_generated_script(self, session_id: str) -> str:
-        """Get the generated script for a session."""
-        session = self.active_sessions[session_id]
-        generated_script = session.get("generated_script", "")
-        
-        if not generated_script:
-            return "Es wurde noch kein Skript generiert. Möchten Sie jetzt ein Skript erstellen?"
-        
-        # Add hallucination warnings if any
-        if "hallucination_warnings" in session:
-            generated_script += session["hallucination_warnings"]
-        
-        return f"Hier ist das generierte Schulungsskript:\n\n{generated_script}"
-    
-    def customize_script_section(self, session_id: str, section_key: str, customization_request: str) -> str:
         """
-        Customize a specific section of the script.
+        Get the generated script for a session.
         
         Args:
             session_id: Session ID
-            section_key: Key of the section to customize
-            customization_request: User's customization request
             
         Returns:
-            Customized section
+            Generated script or error message
         """
-        session = self.active_sessions[session_id]
-        generated_script = session.get("generated_script", "")
-        generation_context = session.get("generation_context", {})
-        
+        session = self.active_sessions.get(session_id)
+        if not session:
+            return "Keine aktive Sitzung gefunden. Bitte starten Sie eine neue Sitzung."
+            
+        generated_script = session.get("generated_script")
         if not generated_script:
-            return "Es gibt noch kein generiertes Skript, das angepasst werden könnte."
+            return "Es wurde noch kein Skript generiert. Bitte durchlaufen Sie den Frageprozess, um ein Skript zu erstellen."
         
-        # Get section title
-        section_info = TEMPLATE_STRUCTURE.get(section_key, {})
-        section_title = section_info.get("title", section_key.replace("_", " ").title())
-        
-        # Extract the current section content
-        section_pattern = re.compile(f"#{{{1,3}}}\\s*{re.escape(section_title)}.*?(?=#{{{1,3}}}|$)", re.DOTALL)
-        match = section_pattern.search(generated_script)
-        
-        if not match:
-            return f"Der Abschnitt '{section_title}' konnte im Skript nicht gefunden werden."
-        
-        current_section = match.group(0)
-        
-        # Get relevant context for this section
-        query = f"{section_title} for {generation_context.get('session_context', {}).get('facility_type', 'medical facility')}"
-        section_context = rag_controller.retrieve_context(query, generation_context.get("session_context", {}))
-        formatted_context = rag_controller.format_retrieved_content_for_prompt(section_context)
-        
-        # Build customization prompt
-        customization_prompt = prompt_builder.build_customization_prompt(
-            base_content=current_section,
-            customization_request=customization_request
-        )
-        
-        # Add the context
-        customization_prompt += f"\n\n# RELEVANT CONTEXT\n{formatted_context}"
-        
-        # Get system prompt
-        system_prompt = prompt_builder.build_system_prompt()
-        
-        # Generate customized section
-        try:
-            customized_section = ollama_client.generate(
-                prompt=customization_prompt,
-                system_prompt=system_prompt,
-                temperature=0.7
-            )
-            
-            # Update the script with the customized section
-            updated_script = re.sub(
-                section_pattern,
-                customized_section,
-                generated_script
-            )
-            
-            # Store the updated script
-            session["generated_script"] = updated_script
-            
-            return f"Der Abschnitt '{section_title}' wurde erfolgreich angepasst. Möchten Sie das aktualisierte Skript sehen?"
-            
-        except Exception as e:
-            system_logger.error(f"Error customizing script section for session {session_id}: {e}")
-            return f"Bei der Anpassung des Abschnitts '{section_title}' ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
+        return f"## Generiertes Schulungsskript\n\n{generated_script}"
 
 # Create a singleton instance
 chatbot_engine = ChatbotEngine()

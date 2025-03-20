@@ -16,6 +16,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Requ
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
@@ -35,11 +36,110 @@ app = FastAPI(
     debug=DEBUG
 )
 
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For development; restrict in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create static directories if they don't exist
+static_dir = Path(__file__).parent / "frontend" / "static"
+templates_dir = Path(__file__).parent / "frontend" / "templates"
+
+for directory in [static_dir, templates_dir]:
+    directory.mkdir(parents=True, exist_ok=True)
+
 # Mount static files
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "frontend" / "static"), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Templates
-templates = Jinja2Templates(directory=Path(__file__).parent / "frontend" / "templates")
+templates = Jinja2Templates(directory=templates_dir)
+
+# Ensure a basic index.html exists if it doesn't already
+index_path = templates_dir / "index.html"
+if not index_path.exists():
+    with open(index_path, "w", encoding="utf-8") as f:
+        f.write("""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Script Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4 text-center">Security Script Generator</h1>
+        <div class="alert alert-info">
+            Willkommen zum Security Script Generator. Bitte starten Sie eine neue Sitzung, um ein Schulungsskript zu erstellen.
+        </div>
+        <div id="chat-container" class="mb-4">
+            <div id="chat-messages" class="border rounded p-3 mb-3" style="height: 400px; overflow-y: auto;"></div>
+            <form id="chat-form">
+                <div class="input-group">
+                    <input type="text" id="message-input" class="form-control" placeholder="Ihre Nachricht...">
+                    <button class="btn btn-primary" type="submit">Senden</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+        // Basic script to handle chat functionality
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        let sessionId = null;
+        
+        // Create a new session when the page loads
+        fetch('/api/sessions', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                sessionId = data.session_id;
+                addMessage('assistant', data.message);
+            });
+        
+        // Handle form submission
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (!message || !sessionId) return;
+            
+            // Add user message to chat
+            addMessage('user', message);
+            messageInput.value = '';
+            
+            // Send message to server
+            fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                addMessage('assistant', data.message);
+            });
+        });
+        
+        // Function to add a message to the chat
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('mb-3');
+            
+            if (role === 'user') {
+                messageDiv.innerHTML = `<div class="text-end"><strong>Sie:</strong></div><div class="bg-light p-2 rounded text-end">${content}</div>`;
+            } else {
+                messageDiv.innerHTML = `<div><strong>Assistent:</strong></div><div class="bg-info bg-opacity-10 p-2 rounded">${content}</div>`;
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    </script>
+</body>
+</html>""")
 
 # Pydantic models for request validation
 class MessageRequest(BaseModel):
@@ -89,25 +189,6 @@ async def send_message(request: MessageRequest):
     return {
         "session_id": session_id,
         "message": response
-    }
-
-@app.post("/api/generate-script")
-async def generate_script(request: GenerateScriptRequest):
-    """Generate a script for a session."""
-    session_id = request.session_id
-    
-    # Check if the session exists
-    session = chatbot_engine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Generate script
-    response = chatbot_engine._generate_script(session_id)
-    
-    return {
-        "session_id": session_id,
-        "message": response,
-        "status": "generated"
     }
 
 @app.get("/api/script/{session_id}")
@@ -188,9 +269,9 @@ async def export_script(request: ExportScriptRequest):
             "metadata": {
                 "session_id": session_id,
                 "generated_at": timestamp,
-                "facility_type": session.get("strategic_responses", {}).get("facility_type", ""),
-                "target_audience": session.get("strategic_responses", {}).get("target_audience", ""),
-                "focus_threats": session.get("strategic_responses", {}).get("focus_threats", "")
+                "facility_type": session.get("script_context", {}).get("facility_type", ""),
+                "target_audience": session.get("script_context", {}).get("target_audience", ""),
+                "focus_threats": session.get("script_context", {}).get("focus_threats", "")
             },
             "sections": sections
         }
@@ -205,29 +286,6 @@ async def export_script(request: ExportScriptRequest):
         )
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported export format: {export_format}")
-
-@app.post("/api/customize-section")
-async def customize_section(request: dict):
-    """Customize a specific section of the script."""
-    session_id = request.get("session_id")
-    section_key = request.get("section_key")
-    customization_request = request.get("customization")
-    
-    if not session_id or not section_key or not customization_request:
-        raise HTTPException(status_code=400, detail="Missing required parameters")
-    
-    # Check if the session exists
-    session = chatbot_engine.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    
-    # Customize the section
-    response = chatbot_engine.customize_script_section(session_id, section_key, customization_request)
-    
-    return {
-        "session_id": session_id,
-        "message": response
-    }
 
 # WebSocket for real-time chat
 @app.websocket("/ws/chat/{session_id}")
@@ -249,105 +307,97 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         
         # Main WebSocket loop
         while True:
-            data = await websocket.receive_json()
-            message_type = data.get("type", "")
-            
-            if message_type == "message":
-                user_message = data.get("content", "")
+            try:
+                data = await websocket.receive_json()
+                message_type = data.get("type", "")
                 
-                # Process message
-                response = chatbot_engine.process_message(session_id, user_message)
+                if message_type == "message":
+                    user_message = data.get("content", "")
+                    
+                    # Process message
+                    response = chatbot_engine.process_message(session_id, user_message)
+                    
+                    # Send response
+                    await websocket.send_json({
+                        "type": "message",
+                        "session_id": session_id,
+                        "role": "assistant",
+                        "content": response
+                    })
                 
-                # Send response
-                await websocket.send_json({
-                    "type": "message",
-                    "session_id": session_id,
-                    "role": "assistant",
-                    "content": response
-                })
-            
-            elif message_type == "generate":
-                # Generate script
-                response = chatbot_engine._generate_script(session_id)
-                
-                # Send response
-                await websocket.send_json({
-                    "type": "generation_complete",
-                    "session_id": session_id,
-                    "message": response
-                })
-            
-            elif message_type == "ping":
-                # Simple ping to keep connection alive
-                await websocket.send_json({
-                    "type": "pong",
-                    "timestamp": datetime.now().isoformat()
-                })
+                elif message_type == "ping":
+                    # Simple ping to keep connection alive
+                    await websocket.send_json({
+                        "type": "pong",
+                        "timestamp": datetime.now().isoformat()
+                    })
+            except json.JSONDecodeError:
+                # Handle non-JSON messages gracefully
+                continue
     
     except WebSocketDisconnect:
         system_logger.info(f"WebSocket connection closed for session {session_id}")
     except Exception as e:
         system_logger.error(f"WebSocket error for session {session_id}: {e}")
-        await websocket.close()
+        try:
+            await websocket.close()
+        except:
+            pass
 
-# Admin routes for managing documents and vector store
-@app.post("/api/admin/documents")
-async def add_document(request: dict):
-    """Add a document to the vector store."""
+# Admin routes for managing the vector database
+@app.post("/api/admin/init-vector-db")
+async def init_vector_db():
+    """Initialize the vector database with example documents."""
     if DEBUG:  # Only available in debug mode
-        filepath = request.get("filepath")
-        collection = request.get("collection", "papers")
-        metadata = request.get("metadata", {})
-        
-        if not filepath:
-            raise HTTPException(status_code=400, detail="Missing filepath parameter")
-        
-        # Load document
-        doc_id = document_loader.load_document(filepath, collection, metadata)
-        
-        if doc_id:
-            return {"status": "success", "document_id": doc_id}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to load document")
-    else:
-        raise HTTPException(status_code=403, detail="Admin routes are only available in debug mode")
-
-@app.post("/api/admin/load-directory")
-async def load_directory(request: dict):
-    """Load all documents in a directory into the vector store."""
-    if DEBUG:  # Only available in debug mode
-        directory = request.get("directory")
-        collection = request.get("collection", "papers")
-        recursive = request.get("recursive", True)
-        
-        if not directory:
-            raise HTTPException(status_code=400, detail="Missing directory parameter")
-        
-        # Load directory
-        doc_ids = document_loader.load_directory(directory, collection, recursive)
-        
-        return {"status": "success", "documents_loaded": len(doc_ids)}
-    else:
-        raise HTTPException(status_code=403, detail="Admin routes are only available in debug mode")
-
-@app.post("/api/admin/threatmap")
-async def load_threatmap(request: dict):
-    """Load a threat map JSON file into the vector store."""
-    if DEBUG:  # Only available in debug mode
-        filepath = request.get("filepath")
-        
-        if not filepath:
-            raise HTTPException(status_code=400, detail="Missing filepath parameter")
-        
-        # Load threat map
-        doc_ids = document_loader.load_threatmap(filepath)
-        
-        return {"status": "success", "threats_loaded": len(doc_ids)}
+        try:
+            # Clear existing data
+            for collection in ["papers", "templates", "threats"]:
+                try:
+                    vector_store.clear_collection(collection)
+                except:
+                    pass
+            
+            # Load examples
+            examples_dir = DOCS_DIR / "examples"
+            templates_dir = DOCS_DIR / "templates"
+            papers_dir = DOCS_DIR / "papers"
+            threats_file = DOCS_DIR / "threats" / "threat_map.json"
+            
+            results = {
+                "examples": 0,
+                "templates": 0,
+                "papers": 0,
+                "threats": 0
+            }
+            
+            # Load examples
+            if examples_dir.exists():
+                example_ids = document_loader.load_directory(examples_dir, "templates")
+                results["examples"] = len(example_ids)
+            
+            # Load templates
+            if templates_dir.exists():
+                template_ids = document_loader.load_directory(templates_dir, "templates")
+                results["templates"] = len(template_ids)
+            
+            # Load papers
+            if papers_dir.exists():
+                paper_ids = document_loader.load_directory(papers_dir, "papers")
+                results["papers"] = len(paper_ids)
+            
+            # Load threats
+            if threats_file.exists():
+                threat_ids = document_loader.load_threatmap(threats_file)
+                results["threats"] = len(threat_ids)
+            
+            return {"status": "success", "results": results}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error initializing vector database: {str(e)}")
     else:
         raise HTTPException(status_code=403, detail="Admin routes are only available in debug mode")
 
 # CLI command handlers
-def init_vector_store(args):
+def init_vector_store_cmd(args):
     """Initialize the vector store with example documents."""
     print("Initializing vector store...")
     
@@ -408,7 +458,7 @@ def run_cli(args):
             
             # Check if we've generated a script
             session = chatbot_engine.get_session(session_id)
-            if session and session.get("generated_script") and session.get("stage") == "followup":
+            if session and session.get("generated_script") and session.get("stage") == "complete":
                 save = input("\nDo you want to save the generated script? (y/n): ")
                 if save.lower() in ["y", "yes"]:
                     # Save the script
@@ -436,7 +486,7 @@ def main():
     
     # init command
     init_parser = subparsers.add_parser("init", help="Initialize the vector store")
-    init_parser.set_defaults(func=init_vector_store)
+    init_parser.set_defaults(func=init_vector_store_cmd)
     
     # server command
     server_parser = subparsers.add_parser("server", help="Run the web server")
