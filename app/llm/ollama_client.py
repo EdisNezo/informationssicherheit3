@@ -38,11 +38,11 @@ class OllamaClient:
     
     @time_operation
     def generate(self, 
-                prompt: str, 
-                system_prompt: Optional[str] = None,
-                temperature: float = 0.7,
-                max_tokens: Optional[int] = None,
-                stream: bool = False) -> Union[str, Generator[str, None, None]]:
+            prompt: str, 
+            system_prompt: Optional[str] = None,
+            temperature: float = 0.7,
+            max_tokens: Optional[int] = None,
+            stream: bool = False) -> Union[str, Generator[str, None, None]]:
         """
         Generate text from the LLM.
         
@@ -61,7 +61,7 @@ class OllamaClient:
         # Prepare request data
         request_data = {
             "model": self.model,
-            "prompt": prompt,
+            "prompt": prompt,  # Don't modify the prompt string
             "temperature": temperature,
             "stream": stream
         }

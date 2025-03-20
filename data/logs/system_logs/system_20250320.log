@@ -47,3 +47,4 @@
 2025-03-20 17:54:31,014 - system - INFO - Combined 5 documents for context generation
 2025-03-20 17:54:31,099 - system - ERROR - Error generating text: 500 Server Error: Internal Server Error for url: http://localhost:11434/api/generate
 2025-03-20 17:54:31,099 - system - ERROR - Error generating script for session e3503db6-703a-410e-96f6-e51a2edf2bee: Invalid format specifier
+2025-03-20 18:58:32,593 - system - INFO - WebSocket connection closed for session e3503db6-703a-410e-96f6-e51a2edf2bee
